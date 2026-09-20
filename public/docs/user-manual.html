@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Manual - ATM Ledger Documentation</title>
+    <link rel="stylesheet" href="/atm/public/assets/css/tailwind.min.css">
+    <style>
+        .sidebar-link.active {
+            color: #4f46e5;
+            font-weight: 700;
+            border-left: 2px solid #4f46e5;
+            padding-left: 0.75rem;
+        }
+        pre code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased font-sans flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="/atm/dashboard" class="flex items-center space-x-2">
+                    <span class="text-xl font-black tracking-tight">ATM<span class="text-indigo-400">LEDGER</span></span>
+                </a>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">End-User Manual</span>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <a href="/atm/public/docs/developer-manual.html" class="text-slate-300 hover:text-white transition">Developer Guide &rarr;</a>
+                <a href="/atm/dashboard" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Return to App</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col md:flex-row gap-8">
+        <!-- Sidebar Navigation (~18%) -->
+        <aside class="w-full md:w-64 flex-shrink-0">
+            <div class="sticky top-24 bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Table of Contents</h3>
+                <nav class="space-y-1.5 text-xs">
+                    <a href="#overview" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">1. Overview &amp; Philosophy</a>
+                    <a href="#roles" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">2. User Roles &amp; Security</a>
+                    <a href="#accounts" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">3. Account Management</a>
+                    <a href="#entry" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">4. Rapid vs Detailed Transaction Entry</a>
+                    <a href="#narration" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">5. Narration Engine</a>
+                    <a href="#presets" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">6. Counterparty Presets</a>
+                    <a href="#ledger" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">7. Ledger, Editing &amp; Voiding</a>
+                    <a href="#statements" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">8. Account Statements</a>
+                    <a href="#admin" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">9. Master Data &amp; Banks</a>
+                    <a href="#shortcuts" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">10. Keyboard Shortcuts</a>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Main Content Area (~82%) -->
+        <main class="flex-1 max-w-4xl bg-white p-8 sm:p-10 rounded-xl border border-gray-200 shadow-sm space-y-12">
+            <!-- Section 1 -->
+            <section id="overview" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 1</span>
+                    <h1 class="text-2xl font-black text-gray-900 mt-0.5">Overview &amp; Core Philosophy</h1>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    <strong>ATM Ledger</strong> is a high-speed, institutional-grade Account &amp; Transaction Management platform engineered for corporate treasury, financial accounting, and high-volume transaction recording.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                    <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                        <div class="text-xs font-bold uppercase tracking-wide text-indigo-800">Dynamic Narration</div>
+                        <p class="text-xs text-indigo-900 mt-1">Smart pattern templates with auto-detected fields and random reference generators.</p>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-100">
+                        <div class="text-xs font-bold uppercase tracking-wide text-green-800">Zero Float Math</div>
+                        <p class="text-xs text-green-900 mt-1">All currency operations execute strictly via 18,2 fixed-point BCMath with zero binary drift.</p>
+                    </div>
+                    <div class="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                        <div class="text-xs font-bold uppercase tracking-wide text-purple-800">Permanent History</div>
+                        <p class="text-xs text-purple-900 mt-1">Transactions link to permanent numeric account IDs. Account renames never corrupt historical statements.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2 -->
+            <section id="roles" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 2</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">User Roles &amp; Security Isolation</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    ATM Ledger enforces strict multi-tenant boundary isolation. Users can only access accounts and transactions created by or assigned to their account.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50 text-gray-600 font-bold uppercase">
+                            <tr>
+                                <th class="px-4 py-2.5 text-left">Capability</th>
+                                <th class="px-4 py-2.5 text-center">Standard User</th>
+                                <th class="px-4 py-2.5 text-center">System Administrator</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            <tr>
+                                <td class="px-4 py-2 font-medium">Create and Manage Accounts</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Own accounts only</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Full visibility</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 font-medium">Post, Edit &amp; Void Transactions</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Own transactions</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Full oversight</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 font-medium">Save Personal Counterparty Presets</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Private to user</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Personal &amp; Global</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 font-medium">Narration Template Builder</td>
+                                <td class="px-4 py-2 text-center text-gray-400">Read only</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Create / Edit / Version</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 font-medium">Bank Master Data Management</td>
+                                <td class="px-4 py-2 text-center text-gray-400">Read only</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Full CRUD &amp; Status</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 font-medium">User Administration &amp; Password Reset</td>
+                                <td class="px-4 py-2 text-center text-gray-400">&times;</td>
+                                <td class="px-4 py-2 text-center text-emerald-600 font-bold">&#10003; Create / Edit / Reset</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Section 3 -->
+            <section id="accounts" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 3</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Account Portfolio Management</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Navigate to <strong>Accounts</strong> from the main menu to view and configure all banking and cash portfolios.
+                </p>
+                <div class="space-y-3 text-xs text-gray-600">
+                    <div class="p-3.5 bg-indigo-50 rounded-lg border border-indigo-200 text-indigo-950">
+                        <strong class="text-indigo-950 text-sm block mb-1">Standard Demonstration Accounts:</strong>
+                        The system includes four pre-configured, clean demo accounts representing Pakistan's primary commercial banks:
+                        <ul class="list-disc list-inside mt-2 space-y-1 font-mono text-xs">
+                            <li><strong>Ali:</strong> Habib Bank Limited &bull; Acc #0417-79011691-01 &bull; PKR 100,000.00</li>
+                            <li><strong>Ahmad:</strong> United Bank Limited &bull; Acc #1102-88239102-02 &bull; PKR 150,000.00</li>
+                            <li><strong>Saeed:</strong> Meezan Bank Limited &bull; Acc #0104-55192038-03 &bull; PKR 80,000.00</li>
+                            <li><strong>Jawad:</strong> Bank Alfalah Limited &bull; Acc #0229-33819204-04 &bull; PKR 120,000.00</li>
+                        </ul>
+                    </div>
+                    <div class="p-3.5 bg-gray-50 rounded-lg border border-gray-200">
+                        <strong class="text-gray-900 text-sm block mb-1">Creating Custom Accounts:</strong>
+                        Click <strong>"+ New Account"</strong>. Enter an account title, select the banking institution from the searchable dropdown, and enter your account or IBAN number. Set the starting opening balance.
+                    </div>
+                    <div class="p-3.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-900">
+                        <strong class="text-amber-950 text-sm block mb-1">Strict Opening Balance Immutability:</strong>
+                        Before any transactions are posted, an account's initial balance may be updated freely. Once the first financial transaction is posted to an account, the initial balance becomes <strong>permanently locked</strong> to ensure audit compliance.
+                    </div>
+                    <div class="p-3.5 bg-gray-50 rounded-lg border border-gray-200">
+                        <strong class="text-gray-900 text-sm block mb-1">Renaming &amp; Account Status:</strong>
+                        Accounts can be safely renamed at any time without corrupting past transactions. If an account is decommissioned, set its status to <em>Inactive</em> or <em>Closed</em>; closed accounts preserve past ledger history but disallow new entries.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 4 -->
+            <section id="entry" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 4</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Rapid vs Detailed Transaction Entry</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    ATM Ledger provides two specialized transaction entry workflows tailored for different operational needs:
+                </p>
+
+                <!-- Workflow A: Rapid Entry -->
+                <div class="p-5 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-800 space-y-4">
+                    <div class="flex items-center justify-between border-b pb-2">
+                        <h3 class="text-sm font-black uppercase tracking-wide text-gray-900 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 mr-2"></span>
+                            A. Rapid Transaction Entry (/transactions/rapid) &mdash; High-Speed Batch Posting
+                        </h3>
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Primary Default Mode</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        Designed for high-speed continuous posting for a single account without repeatedly selecting the account or navigating through heavy dynamic configuration screens.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <div class="p-3.5 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5">
+                            <strong class="text-xs font-bold text-gray-900 uppercase block">1. Manual Narration (Fastest)</strong>
+                            <p class="text-xs text-gray-600">Type description directly in the main narration box. Ideal for cash vouchers, store receipts, utility payments, and unique one-off transactions. Amount is cleared and auto-focused after save.</p>
+                        </div>
+
+                        <div class="p-3.5 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5">
+                            <strong class="text-xs font-bold text-gray-900 uppercase block">2. Quick Narration Mode (Optional Helper)</strong>
+                            <p class="text-xs text-gray-600">Click <em>"+ Use Quick Narration"</em> to open an inline compact template helper. Select common banking templates (IBFT, Funds Transfer, ATM, Cash Deposit) to auto-compile standardized narration.</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 pt-2">
+                        <h4 class="text-xs font-bold uppercase tracking-wide text-gray-900">Key Rapid Entry Capabilities:</h4>
+                        <ul class="list-disc list-inside text-xs space-y-1 text-gray-600">
+                            <li><strong>Persistent Account Lock:</strong> Select the account once; it stays locked across consecutive submissions.</li>
+                            <li><strong>Retained Date &amp; Flow:</strong> Transaction date and Debit/Credit toggle persist across entries (<kbd class="px-1 py-0.5 bg-gray-100 rounded border text-[10px] font-mono">Alt+D</kbd> / <kbd class="px-1 py-0.5 bg-gray-100 rounded border text-[10px] font-mono">Alt+C</kbd>).</li>
+                            <li><strong>Dynamic Required Inputs Only:</strong> Shows only essential inputs for the chosen template (e.g. Sender Name, Bank, Account). No technical JSON or developer metadata.</li>
+                            <li><strong>Compact Generator Refresh (↻):</strong> Click the inline refresh icon to regenerate unique STANs or bank reference numbers instantly.</li>
+                            <li><strong>1-Click Preset Loading:</strong> If presets exist for the template, select from the compact dropdown to pre-fill counterparty details.</li>
+                            <li><strong>Real-Time Narration Compilation:</strong> Narration compiles live directly into the primary description field as you type.</li>
+                            <li><strong>100% Freely Editable:</strong> You can still edit or append to the final compiled text before saving.</li>
+                            <li><strong>Template Retention Across Entries:</strong> The selected Quick Narration template stays active between saves while clearing only transaction-specific inputs.</li>
+                            <li><strong>Instant BCMath Balance Verification:</strong> Live available balance updates in the header card on every submission.</li>
+                            <li><strong>Immediate Focus Reset:</strong> Amount is cleared and auto-focused after save; press <kbd class="px-1.5 py-0.5 bg-gray-800 text-white rounded font-mono text-[10px]">Ctrl+Enter</kbd> to save.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Workflow B: Detailed Entry -->
+                <div class="p-5 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-800 space-y-4">
+                    <div class="flex items-center justify-between border-b pb-2">
+                        <h3 class="text-sm font-black uppercase tracking-wide text-gray-900 flex items-center">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 mr-2"></span>
+                            B. Detailed Transaction Entry (/transactions/detailed) &mdash; Advanced Mode
+                        </h3>
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">Template Engine Mode</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        Preserves 100% of the advanced narration template engine for structured, multi-line pattern configuration, deep preset management, and real-time live preview panels:
+                    </p>
+                    <ul class="list-disc list-inside text-xs space-y-1 text-gray-600">
+                        <li><strong>Database-Driven Templates:</strong> Comprehensive template library with full field definitions.</li>
+                        <li><strong>Live Pattern Compilation Preview:</strong> Visual comparison between dynamic fields and compiled output.</li>
+                        <li><strong>Create &amp; Save Presets:</strong> Save active field combinations as personal or global counterparty presets.</li>
+                        <li><strong>Authoritative Final Textarea:</strong> Independent multi-line textarea with manual override indicators and re-sync trigger.</li>
+                    </ul>
+                </div>
+
+                <!-- When to Use Each Mode -->
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-slate-900">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Operational Decision Guide: When to Use Each Mode</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs divide-y divide-gray-200">
+                            <thead>
+                                <tr class="text-left font-bold text-gray-600 uppercase">
+                                    <th class="py-2 pr-4">Operational Scenario</th>
+                                    <th class="py-2 px-4">Recommended Mode</th>
+                                    <th class="py-2 pl-4">Key Advantage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-gray-700">
+                                <tr>
+                                    <td class="py-2 pr-4 font-semibold">Entering daily bank statements (10-50+ transactions)</td>
+                                    <td class="py-2 px-4 font-bold text-emerald-700">Rapid Entry (Manual / Quick)</td>
+                                    <td class="py-2 pl-4">Locked account, Amount auto-refocus, Ctrl+Enter, zero lag.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 pr-4 font-semibold">Repetitive transfers with auto STAN / Reference numbers</td>
+                                    <td class="py-2 px-4 font-bold text-emerald-700">Rapid Entry (Quick Narration)</td>
+                                    <td class="py-2 pl-4">Keeps template selected, auto-generates fresh unique STAN per save.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 pr-4 font-semibold">Creating reusable beneficiary presets for your team</td>
+                                    <td class="py-2 px-4 font-bold text-indigo-700">Detailed Entry</td>
+                                    <td class="py-2 pl-4">Preset creation dialog with Global/Personal scope configuration.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 pr-4 font-semibold">Complex transactions requiring multi-line breakdown</td>
+                                    <td class="py-2 px-4 font-bold text-indigo-700">Detailed Entry</td>
+                                    <td class="py-2 pl-4">Multi-line textarea, pattern comparison, field re-syncing.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 5 -->
+            <section id="narration" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 5</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Narration Engine &amp; Dynamic Fields</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    The Narration Engine generates standardized, bank-compliant transaction descriptions automatically:
+                </p>
+                <div class="space-y-3 text-xs text-gray-600">
+                    <p>
+                        <strong>1. Select a Template:</strong> Select a template such as <em>IBFT Transfer</em>, <em>Cash Deposit</em>, or <em>Vendor Bill Payment</em>.
+                    </p>
+                    <p>
+                        <strong>2. Dynamic Fields Appear Instantly:</strong> The interface generates the precise fields required by the pattern (e.g. Sender Bank, Beneficiary Name, Account Number).
+                    </p>
+                    <p>
+                        <strong>3. One-Click Value Generators:</strong> Fields requiring STANs or transaction references provide a refresh button (<svg class="w-3.5 h-3.5 inline text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>) that generates random, realistic, collision-free codes.
+                    </p>
+                    <p>
+                        <strong>4. Authoritative Final Text:</strong> The pattern preview updates in real time. The final textarea below can be freely modified or added to. Click <em>"Re-sync from Fields"</em> anytime to reset back to compiled values.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Section 6 -->
+            <section id="presets" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 6</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Counterparty Presets</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Avoid typing repetitive counterparty banking details:
+                </p>
+                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100 text-xs text-indigo-950 space-y-2">
+                    <p><strong>To Save a Preset:</strong> Fill out the dynamic fields for a common counterparty (e.g. <em>Apex Trading</em>). Click <strong>"+ Save Current as Preset"</strong>, assign a name, and save.</p>
+                    <p><strong>To Use a Preset:</strong> Whenever you select that template in future entries, open the <em>Reusable Counterparty Preset</em> dropdown. Choosing the preset fills all fields instantaneously.</p>
+                </div>
+            </section>
+
+            <!-- Section 7 -->
+            <section id="ledger" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 7</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Ledger, Editing &amp; Voiding Transactions</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Access the complete financial history by clicking <strong>Ledger</strong>.
+                </p>
+                <div class="space-y-3 text-xs text-gray-600">
+                    <div class="p-3.5 bg-gray-50 rounded-lg border border-gray-200">
+                        <strong class="text-gray-900 text-sm block mb-1">Editing Transactions:</strong>
+                        Click <strong>"Edit"</strong> on any active transaction. You can modify amounts, date, reference, or narration. When amounts are updated, the account balance adjusts dynamically.
+                    </div>
+                    <div class="p-3.5 bg-red-50 rounded-lg border border-red-200 text-red-900">
+                        <strong class="text-red-950 text-sm block mb-1">Voiding Transactions:</strong>
+                        Financial records cannot be hard deleted. Clicking <strong>"Void"</strong> prompts for a mandatory reason. The transaction status is marked as <code>voided</code>, amounts are excluded from portfolio balances, and the event is logged to the system audit trail.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 8 -->
+            <section id="statements" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 8</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Account Statements &amp; Bank Presentation Formats</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Under <strong>Statements</strong>, users can generate institutional account statements across multiple presentation formats. ATM Ledger enforces strict separation between financial calculation and layout rendering: regardless of the chosen layout, opening balances, running balances, debits, credits, and closing totals are 100% identical and mathematically verified via BCMath.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                        <div class="text-xs font-extrabold uppercase tracking-wide text-indigo-900">Standard Bank Statement</div>
+                        <p class="text-xs text-gray-600">Clean, modern tabular ledger statement featuring summary statistics, account badges, reference instrument numbers, and transaction breakdown.</p>
+                        <span class="inline-block px-2 py-0.5 bg-gray-200 text-gray-700 text-[10px] font-bold rounded">Default Format</span>
+                    </div>
+
+                    <div class="p-4 bg-emerald-50 rounded-lg border border-emerald-200 space-y-2">
+                        <div class="text-xs font-extrabold uppercase tracking-wide text-emerald-900">HBL Statement Layout</div>
+                        <p class="text-xs text-gray-700">Dense institutional layout inspired by authentic Habib Bank Limited account statements. Designed for official printing and client presentation.</p>
+                        <span class="inline-block px-2 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded">Active Format</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3 text-xs text-gray-600">
+                    <div class="p-3.5 bg-white rounded-lg border border-gray-200 shadow-sm space-y-2">
+                        <strong class="text-gray-900 text-sm block">HBL Statement Layout Features:</strong>
+                        <ul class="list-disc list-inside space-y-1.5 pl-1">
+                            <li><strong>Header:</strong> Prominent <code>YOUR ACCOUNT STATEMENT</code> title with uppercase period range (e.g. <code>JUL 01, 2025 TO JUN 30, 2026</code>).</li>
+                            <li><strong>Two-Column Structure:</strong> Customer name and address on the left; dense metadata table on the right displaying Account No, Branch, Account Type, Currency, Printing Date, Frequency (<code>INTERIM / DUPLICATE</code>), Page No, and User ID.</li>
+                            <li><strong>Brought Forward Row:</strong> The transaction table initiates with a dedicated <code>BROUGHT FORWARD</code> row showing the opening balance.</li>
+                            <li><strong>Table Columns:</strong> Fixed banking columns: <code>DATE</code>, <code>VALUE</code>, <code>PARTICULARS</code>, <code>DEBIT</code>, <code>CREDIT</code>, and <code>BALANCE</code>.</li>
+                            <li><strong>Multi-Line Particulars:</strong> Long narrations wrap naturally across multiple lines without truncating or stretching table margins.</li>
+                            <li><strong>Bank Logo Integration:</strong> Automatically renders the official HBL logo configured in Bank Master, or a clean typography badge if no logo is uploaded.</li>
+                            <li><strong>Footers:</strong> System-generated non-signature disclaimer and multi-page continuation indicators.</li>
+                        </ul>
+                    </div>
+
+                    <div class="p-3.5 bg-indigo-50 rounded-lg border border-indigo-200 text-indigo-900">
+                        <strong class="text-indigo-950 text-sm block mb-1">Printing &amp; PDF Export Workflow:</strong>
+                        Click <strong>"Print / PDF View"</strong> on either format to open an A4 print-optimized document. Press <strong>Ctrl + P</strong> (or click the green Print button) to save as an official PDF. Margins, repeating headers (<code>thead { display: table-header-group; }</code>), and page breaks are handled automatically.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 9 -->
+            <section id="admin" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 9</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Bank Master &amp; Administration</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Administrators have access to global management portals:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-xs text-gray-600">
+                    <li><strong>Bank Master (/banks):</strong> Add new institutions, upload bank logos (PNG/JPG/WEBP &le; 2MB), edit codes, or deactivate banks. Logos appear automatically on account statements and bank catalogues.</li>
+                    <li><strong>Templates (/templates):</strong> Define narration patterns, token placeholders, field validation rules, and default options.</li>
+                    <li><strong>Users (/users):</strong> Register new accounts, update roles (User/Admin), adjust statuses, and execute secure password resets.</li>
+                </ul>
+            </section>
+
+            <!-- Section 10 -->
+            <section id="shortcuts" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Section 10</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">Financial Keyboard Shortcuts</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50 text-gray-600 font-bold uppercase">
+                            <tr>
+                                <th class="px-4 py-2.5 text-left">Key Combination</th>
+                                <th class="px-4 py-2.5 text-left">Action</th>
+                                <th class="px-4 py-2.5 text-left">Context</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white font-mono">
+                            <tr>
+                                <td class="px-4 py-2 text-indigo-700 font-bold">Ctrl + Enter</td>
+                                <td class="px-4 py-2 text-gray-900 font-sans">Save Transaction &amp; Close</td>
+                                <td class="px-4 py-2 text-gray-500 font-sans">New Transaction &amp; Edit Views</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 text-emerald-700 font-bold">Alt + N</td>
+                                <td class="px-4 py-2 text-gray-900 font-sans">Save Transaction &amp; Create Another (Fast Batching)</td>
+                                <td class="px-4 py-2 text-gray-500 font-sans">New Transaction View</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-2 text-gray-700 font-bold">Escape</td>
+                                <td class="px-4 py-2 text-gray-900 font-sans">Close Active Modal Dialog</td>
+                                <td class="px-4 py-2 text-gray-500 font-sans">All Modal Windows</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500 mt-auto">
+        ATM Ledger Documentation &bull; Production Core PHP &amp; MariaDB &bull; Zero Float Financial Architecture
+    </footer>
+</body>
+</html>

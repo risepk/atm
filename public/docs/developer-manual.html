@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Technical Manual - ATM Ledger</title>
+    <link rel="stylesheet" href="/atm/public/assets/css/tailwind.min.css">
+    <style>
+        .sidebar-link.active {
+            color: #4f46e5;
+            font-weight: 700;
+            border-left: 2px solid #4f46e5;
+            padding-left: 0.75rem;
+        }
+        pre code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased font-sans flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <a href="/atm/dashboard" class="flex items-center space-x-2">
+                    <span class="text-xl font-black tracking-tight">ATM<span class="text-indigo-400">LEDGER</span></span>
+                </a>
+                <span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">Developer Architecture Manual</span>
+            </div>
+            <div class="flex items-center space-x-4 text-sm">
+                <a href="/atm/public/docs/user-manual.html" class="text-slate-300 hover:text-white transition">&larr; User Manual</a>
+                <a href="/atm/dashboard" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">Return to App</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col md:flex-row gap-8">
+        <!-- Sidebar Navigation (~18%) -->
+        <aside class="w-full md:w-64 flex-shrink-0">
+            <div class="sticky top-24 bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Technical Sections</h3>
+                <nav class="space-y-1.5 text-xs">
+                    <a href="#arch" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">1. System Architecture</a>
+                    <a href="#schema" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">2. Database Schema</a>
+                    <a href="#bcmath" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">3. BCMath Financial Engine</a>
+                    <a href="#engine" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">4. Narration Engine Internals</a>
+                    <a href="#select2" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">5. Select2 Integration</a>
+                    <a href="#security" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">6. Security &amp; IDOR Protection</a>
+                    <a href="#audit" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">7. Audit Trail &amp; Mutations</a>
+                    <a href="#routes" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">8. Route &amp; API Reference</a>
+                    <a href="#testing" class="sidebar-link block py-1 text-gray-600 hover:text-indigo-600 transition">9. Automated Test Suite</a>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Main Content Area (~82%) -->
+        <main class="flex-1 max-w-4xl bg-white p-8 sm:p-10 rounded-xl border border-gray-200 shadow-sm space-y-12">
+            <!-- Section 1 -->
+            <section id="arch" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Architecture</span>
+                    <h1 class="text-2xl font-black text-gray-900 mt-0.5">1. Core PHP Architecture &amp; MVC Design</h1>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    ATM Ledger is constructed with vanilla, framework-less <strong>Core PHP 8.2</strong> and <strong>MariaDB 10.4</strong>. It avoids heavy framework overhead while maintaining strict Model-View-Controller (MVC) separation of concerns.
+                </p>
+                <div class="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-xs font-mono">
+                    HTTP Request &rarr; .htaccess &rarr; public/index.php &rarr; Router &rarr; Middleware (auth, csrf, role) &rarr; Controller &rarr; Service &rarr; Model (PDO) &rarr; View (PHTML)
+                </div>
+            </section>
+
+            <!-- Section 2 -->
+            <section id="schema" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Database</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">2. Database Schema &amp; Financial Integrity</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Financial accuracy requires immutable design invariants:
+                </p>
+                <ul class="list-disc list-inside space-y-1 text-xs text-gray-600">
+                    <li><strong>Primary Keys:</strong> <code>BIGINT UNSIGNED AUTO_INCREMENT</code> for permanent sequential identity.</li>
+                    <li><strong>UUIDs:</strong> <code>CHAR(36)</code> for cross-system and API reconciliation.</li>
+                    <li><strong>Monetary Columns:</strong> Strictly <code>DECIMAL(18,2)</code>. No <code>FLOAT</code> or <code>DOUBLE</code> types exist anywhere in the schema.</li>
+                    <li><strong>Virtual Balance Derivation:</strong> Portfolio balances are computed dynamically from starting balance + sum of active credits - sum of active debits. Voided transactions are strictly filtered by <code>status != 'voided' AND deleted_at IS NULL</code>.</li>
+                </ul>
+            </section>
+
+            <!-- Section 3 -->
+            <section id="bcmath" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Financial Math</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">3. BCMath Financial Calculation Engine</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Binary floating point numbers in computing (IEEE 754) produce rounding artifacts (e.g. <code>0.1 + 0.2 = 0.30000000000000004</code>). In financial ledgers, this drift is completely unacceptable.
+                </p>
+                <div class="p-4 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900">
+                    <strong>Rule:</strong> Floating point casting (<code>(float)</code> or <code>floatval()</code>) is strictly banned on financial balances. All addition, subtraction, and comparisons must use <code>CurrencyHelper</code> (which wraps <code>bcadd</code>, <code>bcsub</code>, <code>bccomp</code> with scale 2).
+                </div>
+                <div class="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs font-mono">
+<pre><code>// Correct Financial Calculation:
+$newBalance = CurrencyHelper::sub($currentBalance, $debitAmount);
+
+// Comparison:
+if (CurrencyHelper::comp($amount, '0.00') &gt; 0) { ... }</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 4 -->
+            <section id="engine" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Narration</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">4. Narration Template Engine &amp; Rapid Entry Integration</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    The Narration Engine provides dynamic token substitution, generator assistance, and authoritative historical ledger snapshots.
+                </p>
+
+                <!-- Architectural Pipeline Diagram -->
+                <div class="p-4 bg-slate-900 text-slate-100 rounded-xl overflow-x-auto text-xs font-mono leading-relaxed space-y-1">
+                    <div class="text-emerald-400 font-bold">// Narration Architecture: Rapid Entry Hooks into Existing Engine</div>
+                    <div>Rapid Entry (/transactions/rapid)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Quick Narration Selection (Active DB Templates)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Existing Template Engine (NarrationService / NarrationEngine)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Dynamic Required Inputs (Only fields matching pattern tokens)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Generated Narration (Live token compilation)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Final Narration (Authoritative &amp; freely editable by user)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;↓</div>
+                    <div>Save Transaction (POST /api/transactions/save with template snapshot)</div>
+                </div>
+
+                <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 space-y-1">
+                    <strong class="font-bold text-sm block">Architectural Invariant: Zero Logic Duplication</strong>
+                    <p>
+                        Rapid Entry <strong>must not duplicate</strong> narration compilation, validation, generator rules, or snapshot storage.
+                        It reuses the exact same <code>NarrationEngine.compile()</code>, <code>GeneratorService</code> rules, and <code>TransactionService::createTransaction()</code> payload schema (<code>template_id</code>, <code>template_version</code>, <code>template_payload</code>).
+                        Historical transactions remain immutable if templates are updated later.
+                    </p>
+                </div>
+
+                <ul class="list-disc list-inside space-y-1 text-xs text-gray-600 pt-1">
+                    <li><strong>Token Detection:</strong> Patterns use bracketed notation: <code>{field_key}</code>. In template creation/editing, the parser auto-infers field types:
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-700">{stan} &rarr; stan</code>,
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-700">{sender_bank} &rarr; bank</code>,
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-indigo-700">{account} &rarr; account</code>.
+                    </li>
+                    <li><strong>Version Preservation:</strong> When an admin updates a template, the template <code>version</code> increments. Existing transactions retain their historical narration string and original <code>template_version</code> snapshot.</li>
+                    <li><strong>Generator Rules:</strong> <code>GeneratorService::generate()</code> creates random 6-digit STANs, bank reference numbers (prefix + YYMMDD + 8 digits), and unique alphanumeric IDs with collision protection.</li>
+                </ul>
+            </section>
+
+            <!-- Section 5 -->
+            <section id="select2" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">UI / Frontend</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">5. Select2 Integration &amp; Tailwind Styling</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Searchable comboboxes are powered by Select2 4.1, customized via <code>select2-tailwind.css</code>:
+                </p>
+                <ul class="list-disc list-inside space-y-1 text-xs text-gray-600">
+                    <li>Matches Tailwind's <code>rounded-lg</code>, <code>border-gray-300</code>, and <code>ring-indigo-500</code> focus states.</li>
+                    <li><code>dropdownParent</code> is automatically bound to the closest modal container so typing in search inputs works inside Tailwind modals.</li>
+                    <li><code>select2.min.js</code> and <code>jquery.min.js</code> are loaded in <code>header.php</code> to prevent asynchronous execution race conditions.</li>
+                </ul>
+            </section>
+
+            <!-- Section 6 -->
+            <section id="security" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Security</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">6. Security &amp; IDOR Protection</h2>
+                </div>
+                <div class="space-y-3 text-xs text-gray-600">
+                    <p><strong>IDOR Isolation:</strong> All account and transaction queries verify <code>WHERE user_id = :session_user_id</code> unless the authenticated user holds the <code>admin</code> role.</p>
+                    <p><strong>CSRF Token:</strong> All state-changing HTTP POST requests require a valid <code>_csrf_token</code> verified by <code>CSRF::validateToken()</code>.</p>
+                    <p><strong>Password Security:</strong> Passwords are hashed with bcrypt (<code>PASSWORD_DEFAULT</code>) and input is preserved verbatim without trimming spaces.</p>
+                    <p><strong>XSS Prevention:</strong> All user strings displayed in views are sanitized via <code>e()</code> (<code>htmlspecialchars(..., ENT_QUOTES, 'UTF-8')</code>).</p>
+                </div>
+            </section>
+
+            <!-- Section 7 -->
+            <section id="audit" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Auditing</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">7. Audit Trail &amp; Mutations</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Every sensitive mutation (account creation, bank addition, status toggle, transaction editing, transaction voiding) writes an immutable record to <code>audit_logs</code> with:
+                </p>
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono">
+                    user_id &bull; action &bull; entity_type &bull; entity_id &bull; old_values (JSON) &bull; new_values (JSON) &bull; ip_address &bull; created_at
+                </div>
+            </section>
+
+            <!-- Section 8 -->
+            <section id="routes" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">API</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">8. Route &amp; API Reference</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-xs divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50 text-gray-600 font-bold uppercase">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Method</th>
+                                <th class="px-3 py-2 text-left">Route</th>
+                                <th class="px-3 py-2 text-left">Controller Action</th>
+                                <th class="px-3 py-2 text-left">Middleware</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white font-mono text-[11px]">
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/dashboard</td><td class="px-3 py-1.5">DashboardController@index</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/accounts</td><td class="px-3 py-1.5">AccountController@index</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/accounts/save</td><td class="px-3 py-1.5">AccountController@apiSave</td><td class="px-3 py-1.5 font-sans">auth, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/transactions/rapid</td><td class="px-3 py-1.5">TransactionController@rapid</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/transactions/detailed</td><td class="px-3 py-1.5">TransactionController@detailed</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/transactions/create</td><td class="px-3 py-1.5">TransactionController@create (Redirects to /rapid)</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/api/accounts/{id}/recent-transactions</td><td class="px-3 py-1.5">TransactionController@apiRecent</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/transactions/save</td><td class="px-3 py-1.5">TransactionController@apiSave</td><td class="px-3 py-1.5 font-sans">auth, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/transactions/{id}/update</td><td class="px-3 py-1.5">TransactionController@apiUpdate</td><td class="px-3 py-1.5 font-sans">auth, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/transactions/{id}/void</td><td class="px-3 py-1.5">TransactionController@apiVoid</td><td class="px-3 py-1.5 font-sans">auth, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/banks</td><td class="px-3 py-1.5">MasterDataController@index</td><td class="px-3 py-1.5 font-sans">auth, admin</td></tr>
+                            <tr><td class="px-3 py-1.5 text-blue-600 font-bold">GET</td><td class="px-3 py-1.5">/api/master/banks</td><td class="px-3 py-1.5">MasterDataController@banks</td><td class="px-3 py-1.5 font-sans">auth</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/master/banks/add</td><td class="px-3 py-1.5">MasterDataController@addBank</td><td class="px-3 py-1.5 font-sans">auth, admin, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/master/banks/{id}/update</td><td class="px-3 py-1.5">MasterDataController@updateBank</td><td class="px-3 py-1.5 font-sans">auth, admin, csrf</td></tr>
+                            <tr><td class="px-3 py-1.5 text-green-600 font-bold">POST</td><td class="px-3 py-1.5">/api/master/banks/{id}/toggle-status</td><td class="px-3 py-1.5">MasterDataController@toggleBankStatus</td><td class="px-3 py-1.5 font-sans">auth, admin, csrf</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Section 9 -->
+            <section id="testing" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">QA</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">9. Automated Test Suite &amp; Regression Prevention</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    ATM Ledger includes a comprehensive CLI test suite located in <code>tests/run_tests.php</code> covering 20 distinct functional areas and 202 rigorous assertions with 100% pass rate.
+                </p>
+                <div class="p-4 bg-gray-900 text-gray-100 rounded-lg text-xs font-mono">
+                    php tests/run_tests.php
+                </div>
+                <p class="text-xs text-gray-500">
+                    Always execute this test suite before committing any code changes. All tests must pass with 100% success rate.
+                </p>
+            </section>
+
+            <!-- Section 10 -->
+            <section id="statement-architecture" class="space-y-4">
+                <div class="border-b border-gray-200 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Statements &amp; Branding</span>
+                    <h2 class="text-xl font-bold text-gray-900 mt-0.5">10. Extensible Statement Architecture &amp; HBL Renderer</h2>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    The Statement Presentation system strictly decouples the financial calculations engine from visual formatting. Financial values are calculated once by <code>StatementService</code> using BCMath and passed downstream into visual renderers:
+                </p>
+
+                <div class="p-4 bg-gray-900 text-emerald-400 rounded-lg overflow-x-auto text-xs font-mono leading-relaxed">
+                    StatementService (BCMath calculations)<br>
+                    &nbsp;&nbsp;&darr; (opening balance, posted txs, debits, credits, running balances, closing balance)<br>
+                    StatementRendererFactory::create($formatCode)<br>
+                    &nbsp;&nbsp;&darr;<br>
+                    HBLStatementRenderer / StandardStatementRenderer<br>
+                    &nbsp;&nbsp;&darr; renderHtml() / renderPrint()<br>
+                    Screen Preview &amp; Print / Save as PDF
+                </div>
+
+                <div class="overflow-x-auto pt-2">
+                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">HBL Field Mapping Matrix</h4>
+                    <table class="min-w-full text-xs divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                        <thead class="bg-gray-50 text-gray-700 font-bold uppercase">
+                            <tr>
+                                <th class="px-3 py-2 text-left">HBL Sample Field</th>
+                                <th class="px-3 py-2 text-left">Database / Service Source</th>
+                                <th class="px-3 py-2 text-left">Table / Class Origin</th>
+                                <th class="px-3 py-2 text-left">Handling / Fallback</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white font-mono text-[11px]">
+                            <tr><td class="px-3 py-1.5 font-bold">Document Title</td><td class="px-3 py-1.5 font-sans">"YOUR ACCOUNT STATEMENT"</td><td class="px-3 py-1.5 font-sans">HBLStatementRenderer</td><td class="px-3 py-1.5 font-sans">Static uppercase title</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">Period Range</td><td class="px-3 py-1.5 font-sans">start_date, end_date</td><td class="px-3 py-1.5 font-sans">StatementService</td><td class="px-3 py-1.5 font-sans">Formatted uppercase: <code>JUL 01, 2025 TO JUN 30, 2026</code></td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">Customer Name</td><td class="px-3 py-1.5 font-sans">account_title</td><td class="px-3 py-1.5 font-sans">accounts</td><td class="px-3 py-1.5 font-sans">HTML-escaped customer title</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">Customer Address</td><td class="px-3 py-1.5 font-sans">notes</td><td class="px-3 py-1.5 font-sans">accounts</td><td class="px-3 py-1.5 font-sans">Parsed line-by-line; clean fallback to "PK" if blank</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">ACCOUNT NO</td><td class="px-3 py-1.5 font-sans">account_number</td><td class="px-3 py-1.5 font-sans">accounts</td><td class="px-3 py-1.5 font-sans">Customer bank account / IBAN string</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">BRANCH</td><td class="px-3 py-1.5 font-sans">bank_code / notes</td><td class="px-3 py-1.5 font-sans">master_banks</td><td class="px-3 py-1.5 font-sans">Appended after account number (e.g. <code>OF 0042</code>)</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">ACCOUNT TYPE</td><td class="px-3 py-1.5 font-sans">Default / Config</td><td class="px-3 py-1.5 font-sans">HBLStatementRenderer</td><td class="px-3 py-1.5 font-sans">"HBL FreedomAccount"</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">CURRENCY</td><td class="px-3 py-1.5 font-sans">currency</td><td class="px-3 py-1.5 font-sans">accounts</td><td class="px-3 py-1.5 font-sans">Normalized: <code>PKR</code> &rarr; "Pakistani Rupee"</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">PRINTING DATE</td><td class="px-3 py-1.5 font-sans">Current generation date</td><td class="px-3 py-1.5 font-sans">System date()</td><td class="px-3 py-1.5 font-sans">Formatted <code>d-m-y</code> (e.g. <code>07-09-26</code>)</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">FREQUENCY</td><td class="px-3 py-1.5 font-sans">Configurable default</td><td class="px-3 py-1.5 font-sans">HBLStatementRenderer</td><td class="px-3 py-1.5 font-sans">"INTERIM / DUPLICATE"</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">USER</td><td class="px-3 py-1.5 font-sans">username</td><td class="px-3 py-1.5 font-sans">Session</td><td class="px-3 py-1.5 font-sans">Authenticated user username code</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">BROUGHT FORWARD</td><td class="px-3 py-1.5 font-sans">opening_balance</td><td class="px-3 py-1.5 font-sans">StatementService</td><td class="px-3 py-1.5 font-sans">First row of transaction table with opening balance</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">DATE &amp; VALUE</td><td class="px-3 py-1.5 font-sans">transaction_date</td><td class="px-3 py-1.5 font-sans">transactions</td><td class="px-3 py-1.5 font-sans">Transaction date serves as value date</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">PARTICULARS</td><td class="px-3 py-1.5 font-sans">narration</td><td class="px-3 py-1.5 font-sans">transactions</td><td class="px-3 py-1.5 font-sans">Authoritative saved narration; multi-line wrapping</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">DEBIT &amp; CREDIT</td><td class="px-3 py-1.5 font-sans">debit, credit</td><td class="px-3 py-1.5 font-sans">transactions</td><td class="px-3 py-1.5 font-sans">Formatted <code>DECIMAL(18,2)</code>; dash/blank if zero</td></tr>
+                            <tr><td class="px-3 py-1.5 font-bold">BALANCE</td><td class="px-3 py-1.5 font-sans">balance</td><td class="px-3 py-1.5 font-sans">StatementService</td><td class="px-3 py-1.5 font-sans">Cumulative BCMath balance after each transaction</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-2">
+                    <strong class="text-gray-900 block font-bold">Future Bank Statement Implementation Guide:</strong>
+                    <p class="text-gray-600">When adding future bank layouts (Meezan Bank, UBL, Bank Alfalah, MCB):</p>
+                    <ol class="list-decimal pl-5 space-y-1 text-gray-600">
+                        <li>Study authentic client sample layout and map visual columns.</li>
+                        <li>Create a new dedicated renderer class implementing <code>StatementRendererInterface</code>.</li>
+                        <li>Never recalculate balances independently; always consume pre-calculated figures from <code>$statementData</code>.</li>
+                        <li>Register the class in <code>StatementRendererFactory</code> and activate the format in <code>statement_formats</code> table.</li>
+                        <li>Add regression tests in <code>tests/run_tests.php</code> proving 100% financial parity with Standard format.</li>
+                    </ol>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="bg-gray-900 text-gray-400 border-t border-gray-800 py-4 text-center text-xs mt-auto">
+        ATM Ledger Developer Manual &bull; Core PHP 8.2 &bull; MariaDB 10.4 &bull; BCMath Fixed Precision
+    </footer>
+</body>
+</html>
