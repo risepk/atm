@@ -1,4 +1,17 @@
-<!-- views/accounts/index.php -->
+<!-- 
+================================================================================
+File: views/accounts/index.php
+Browser URL: http://localhost/atm/accounts.php (or /atm/account.php)
+Description: Client Account Detail & Financial Portfolio (کلائنٹ اکاؤنٹس اور بیلنس مینجمنٹ)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. اس فائل میں تمام کھاتے داروں (Accounts) کی لسٹ، نیا اکاؤنٹ بنانے اور ایڈٹ کرنے کے آپشنز ہیں۔
+2. ہر اکاؤنٹ کے سامنے "Entry" کا بٹن اسے /atm/transactions/rapid.php میں کھولتا ہے۔
+3. "Report" کا بٹن اسی اکاؤنٹ کی اسٹیٹمنٹ /atm/statements.php میں کھولتا ہے۔
+4. اگر آپ نے اکاؤنٹ فارم میں کوئی نیا فیلڈ شامل کرنا ہو یا ٹیبل کے کالمز تبدیل کرنے ہوں تو
+   اس فائل میں تبدیلیاں کر سکتے ہیں۔
+================================================================================
+-->
 <?php 
 $pageTitle = 'Account Detail & Management'; 
 require __DIR__ . '/../layouts/header.php'; 
@@ -87,10 +100,10 @@ require __DIR__ . '/../layouts/navigation.php';
                                     </span>
                                 </td>
                                 <td class="text-center space-x-1">
-                                    <a href="/atm/transactions/rapid?account_id=<?= $acc['id'] ?>" class="win-btn win-btn-sm text-emerald-900 font-bold" title="Open TransactionFrm for this account">
+                                    <a href="/atm/transactions/rapid.php?account_id=<?= $acc['id'] ?>" class="win-btn win-btn-sm text-emerald-900 font-bold" title="Open TransactionFrm for this account">
                                         Entry
                                     </a>
-                                    <a href="/atm/statements?account_id=<?= $acc['id'] ?>" class="win-btn win-btn-sm text-blue-900 font-bold" title="Generate Bank Statement">
+                                    <a href="/atm/statements.php?account_id=<?= $acc['id'] ?>" class="win-btn win-btn-sm text-blue-900 font-bold" title="Generate Bank Statement">
                                         Report
                                     </a>
                                     <button type="button" onclick="openEditAccountModal(<?= htmlspecialchars(json_encode($acc), ENT_QUOTES, 'UTF-8') ?>)" class="win-btn win-btn-sm text-gray-800">

@@ -45,12 +45,19 @@ class Router {
         $method = $request->getMethod();
         $uri = $request->getUri();
 
+        // Support .php extensions transparently (e.g. /dashboard.php -> /dashboard)
+        // This allows user to visit both with and without .php without breaking anything.
+        $normalizedUri = preg_replace('/\.php$/i', '', $uri);
+        if ($normalizedUri === '') {
+            $normalizedUri = '/';
+        }
+
         foreach ($this->routes as $route) {
             if ($route['method'] !== $method) {
                 continue;
             }
 
-            if (preg_match($route['regex'], $uri, $matches)) {
+            if (preg_match($route['regex'], $uri, $matches) || preg_match($route['regex'], $normalizedUri, $matches)) {
                 $params = [];
                 foreach ($matches as $k => $v) {
                     if (is_string($k)) {
@@ -73,6 +80,36 @@ class Router {
             http_response_code(404);
             Response::render('errors/404', ['uri' => $uri]);
         }
+    }
+
+    /**
+     * Helper to inspect route matching for automated tests and route resolution verification.
+     */
+    public function matchRoute(string $method, string $uri): ?array {
+        $method = strtoupper($method);
+        $normalizedUri = preg_replace('/\.php$/i', '', $uri);
+        if ($normalizedUri === '') {
+            $normalizedUri = '/';
+        }
+
+        foreach ($this->routes as $route) {
+            if ($route['method'] !== $method) {
+                continue;
+            }
+            if (preg_match($route['regex'], $uri, $matches) || preg_match($route['regex'], $normalizedUri, $matches)) {
+                $params = [];
+                foreach ($matches as $k => $v) {
+                    if (is_string($k)) {
+                        $params[$k] = $v;
+                    }
+                }
+                return [
+                    'route' => $route,
+                    'params' => $params
+                ];
+            }
+        }
+        return null;
     }
 
     private function runMiddlewarePipeline(array $middlewareNames, Request $request, Closure $destination): void {

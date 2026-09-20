@@ -1,4 +1,15 @@
-<!-- views/templates/edit.php -->
+<!-- 
+================================================================================
+File: views/templates/edit.php
+Browser URL: http://localhost/atm/templates/{id}/edit.php (or /edit)
+Description: Narration Template Pattern & Dynamic Fields Editor (ٹیمپلیٹ ایڈیٹر)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. اس فائل کے ذریعے مخصوص نریشن ٹیمپلیٹ کے پیٹرن اور متغیرات (Variables) ایڈٹ ہوتے ہیں۔
+2. یہاں سے نئے فیلڈز (جیسے IBAN, Bank, Amount, Title) کے فارم ان پٹس سیٹ ہوتے ہیں۔
+3. Cancel یا Close پر کلک کرنے سے واپس /atm/templates.php پر منتقل ہوتا ہے۔
+================================================================================
+-->
 <?php $pageTitle = 'Edit Template: ' . e($template['name']); require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-5xl w-full mx-auto px-2 sm:px-4 py-4">
@@ -12,7 +23,7 @@
                 <span>Edit Narration Template: <?= e($template['name']) ?> (v<?= $template['version'] ?>)</span>
             </div>
             <div class="flex items-center space-x-1">
-                <a href="/atm/templates" class="w-3 h-3 flex items-center justify-center text-[10px] text-[#2c4c70] cursor-pointer hover:bg-red-500 hover:text-white rounded" title="Close">✕</a>
+                <a href="/atm/templates.php" class="w-3 h-3 flex items-center justify-center text-[10px] text-[#2c4c70] cursor-pointer hover:bg-red-500 hover:text-white rounded" title="Close">✕</a>
             </div>
         </div>
 
@@ -63,7 +74,7 @@
             </div>
 
             <div class="flex justify-end space-x-2 pt-2 border-t border-[#cbd9e8]">
-                <a href="/atm/templates" class="win-btn">Cancel</a>
+                <a href="/atm/templates.php" class="win-btn">Cancel</a>
                 <button type="submit" id="save-template-btn" class="win-btn font-bold text-purple-900">Update Template</button>
             </div>
         </form>
@@ -257,7 +268,7 @@ $('#template-editor-form').on('submit', function(e) {
         $('#save-template-btn').prop('disabled', false);
         if (res.success) {
             window.showToast('Template updated successfully!', 'success');
-            setTimeout(function() { window.location.href = '/atm/templates'; }, 700);
+            setTimeout(function() { window.location.href = '/atm/templates.php'; }, 700);
         } else {
             alert(res.message || 'Error updating template.');
         }

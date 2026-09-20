@@ -1,4 +1,15 @@
-<!-- views/users/index.php -->
+<!-- 
+================================================================================
+File: views/users/index.php
+Browser URL: http://localhost/atm/users.php (or /atm/user.php)
+Description: User Administration & Operator Management (سسٹم یوزرز اور آپریٹرز)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. اس سکرین کے ذریعے سسٹم کے تمام یوزرز (Admin اور Operator) کو منظم کیا جاتا ہے۔
+2. "Create New User" کے ذریعے نیا آپریٹر بنایا جاتا ہے۔
+3. ہر یوزر کے سامنے ایڈٹ، پاس ورڈ ری سیٹ اور ایکٹو/غیر ایکٹو کرنے کے بٹنز ہیں۔
+================================================================================
+-->
 <?php $pageTitle = 'User Administration'; require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-4">

@@ -533,8 +533,11 @@ $runner->assertThrows(function() use ($presetService, $user1Preset, $user2) {
     $presetService->deletePreset((int)$user1Preset['id'], (int)$user2['id'], false);
 }, Exception::class, "Authorization: User 2 cannot delete User 1's preset");
 
-// Deactivate test template so it does not pollute suggestions
-$tplModel->update($tplId, ['is_active' => 0]);
+// Clean up test presets, fields, transaction and template to prevent database pollution
+$db->query("DELETE FROM `narration_presets` WHERE `template_id` = {$tplId}");
+$db->query("DELETE FROM `narration_template_fields` WHERE `template_id` = {$tplId}");
+$db->query("DELETE FROM `transactions` WHERE `id` = {$histTxId}");
+$db->query("DELETE FROM `narration_templates` WHERE `id` = {$tplId}");
 
 // ====================================================
 // 9. Pakistan Bank Master & Dynamic Addition
@@ -553,6 +556,9 @@ $runner->assert($newBankId > 0, "Master Banks: Admin dynamically added new bank"
 $runner->assertThrows(function() use ($bankModel, $uniqueBankName) {
     $bankModel->addBank(strtolower($uniqueBankName));
 }, Exception::class, "Master Banks: Case-insensitive duplicate bank name rejected");
+
+// Clean up temporary test bank
+$db->query("DELETE FROM `master_banks` WHERE `id` = {$newBankId}");
 
 // ====================================================
 // 10. Statement Presentation Engine
@@ -786,6 +792,9 @@ $clearedBank = $bankModel->find($bankWithLogoId);
 $runner->assert($clearedBank['logo_path'] === null, "Bank Logo Removal: logo_path set to NULL in database");
 $runner->assert(!file_exists($dummyPng2), "Bank Logo Removal: File deleted from disk when logo removed");
 
+// Clean up temporary test bank
+$db->query("DELETE FROM `master_banks` WHERE `id` = {$bankWithLogoId}");
+
 // ====================================================
 // 17. Statement Presentation Architecture & Renderers
 // ====================================================
@@ -832,8 +841,11 @@ $printOutput = $stmtService->renderPrint($stmtWithLogo);
 $runner->assert(strpos($printOutput, '<!DOCTYPE html>') !== false, "Statement Renderer: renderPrint produces standalone printable HTML");
 $runner->assert(strpos($printOutput, 'window.print()') !== false, "Statement Renderer: renderPrint includes browser print button");
 
-// Clean up test file
+// Clean up test file, test account and test bank
 @unlink($dummyPng1);
+$db->query("DELETE FROM `transactions` WHERE `account_id` = {$accountWithLogo['id']}");
+$db->query("DELETE FROM `accounts` WHERE `id` = {$accountWithLogo['id']}");
+$db->query("DELETE FROM `master_banks` WHERE `id` = {$bankWithLogoId2}");
 
 // ====================================================
 // 18. UI Contrast & Responsive Navigation Verification
@@ -1792,6 +1804,8 @@ $runner->assert($updatedShort['bank_name'] === 'Habib Bank Limited', "Short Code
 // Cleanup short code account
 $accountService->deleteAccount((int)$shortCodeAcc['id'], (int)$user1['id'], false);
 $runner->assert($accountModel->find((int)$shortCodeAcc['id']) === null, "Short Code Account: Cleaned up temporary account '14'");
+// Hard delete so it does not remain in accounts table
+$db->query("DELETE FROM `accounts` WHERE `id` = {$shortCodeAcc['id']}");
 
 // 2. NarrationEngine JS verification: narration alias & token regex
 $engineJs = file_get_contents(__DIR__ . '/../public/assets/js/narration-engine.js');
@@ -1823,6 +1837,16 @@ $rrn = GeneratorService::generate(['type' => 'rrn']);
 $runner->assert(strlen($rrn) === 12 && ctype_digit($rrn), "Generator: Generates 12-digit RRN ({$rrn})");
 
 // 2. Suggestions API excludes VENDOR_TEST templates and returns active banking templates
+$tempVendorTplId = $tplModel->insert([
+    'uuid' => SecurityHelper::uuid(),
+    'name' => 'Transient Vendor Test',
+    'code' => 'VENDOR_TEST_TMP',
+    'pattern' => 'VENDOR TEST',
+    'description' => 'temp',
+    'version' => 1,
+    'is_active' => 0
+]);
+
 $subScript = __DIR__ . '/test_api_suggestions_tmp.php';
 file_put_contents($subScript, '<?php
 session_start();
@@ -1854,6 +1878,8 @@ foreach ($suggTemplates as $st) {
     if ($st['code'] === 'IBFT_OUTWARD' || $st['code'] === 'IBFT') $foundIbft = true;
 }
 $runner->assert(!$hasVendorTest, "Suggestions API: Transient VENDOR_TEST templates strictly excluded");
+// Clean up temporary test template immediately
+$db->query("DELETE FROM `narration_templates` WHERE `id` = {$tempVendorTplId}");
 $runner->assert($foundAtm, "Suggestions API: ATM Cash Withdrawal template present");
 $runner->assert($foundIbft, "Suggestions API: IBFT template present");
 
@@ -2051,22 +2077,19 @@ $runner->assert(strpos($printHtml, 'Account Statement') !== false, "Faysal Print
 $runner->assert(strpos($printHtml, 'summary-box') !== false, "Faysal Print: Contains account summary box");
 $runner->assert(strpos($printHtml, 'disclaimer-section') !== false && strpos($printHtml, 'ISLAMABAD BRANCH') === false, "Faysal Print: Contains disclaimer section and clean space for physical stamp/sign");
 
-// 8. MasterBank Uploaded Logo Utilization Verification
-// Simulate uploaded bank logo in master_banks
-$testLogoRelPath = 'uploads/banks/test_fbl_logo.png';
-$bankModel->updateBank($fblExact['id'], $fblExact['bank_name'], $fblExact['bank_code'], $fblExact['swift_code'], $testLogoRelPath);
+// 8. MasterBank Uploaded Logo Utilization Verification (Protects user's real uploaded logo)
+$freshFbl = $bankModel->find($fblExact['id']);
+$expectedLogoPath = $freshFbl['logo_path'];
+$runner->assert(!empty($expectedLogoPath), "MasterBank: User's uploaded Faysal Bank logo exists and is protected ({$expectedLogoPath})");
 
 $stmtDataWithLogo = $stmtService->generateStatement($fblAccId, '2023-04-01', '2023-06-30', 'faysal', $adminUser['id'], true);
-$runner->assert($stmtDataWithLogo['account']['bank_logo'] === $testLogoRelPath, "MasterBank: Correctly attaches uploaded bank logo path");
+$runner->assert($stmtDataWithLogo['account']['bank_logo'] === $expectedLogoPath, "MasterBank: Correctly attaches uploaded bank logo path");
 
 $htmlWithLogo = $stmtService->renderHtml($stmtDataWithLogo);
-$runner->assert(strpos($htmlWithLogo, '<img src="/atm/public/uploads/banks/test_fbl_logo.png"') !== false, "Faysal HTML: Utilizes uploaded bank logo from atm/banks");
+$runner->assert(strpos($htmlWithLogo, $expectedLogoPath) !== false, "Faysal HTML: Utilizes uploaded bank logo from atm/banks");
 
 $printWithLogo = $faysalRenderer->renderPrint($stmtDataWithLogo);
-$runner->assert(strpos($printWithLogo, 'uploads/banks/test_fbl_logo.png') !== false, "Faysal Print: Utilizes uploaded bank logo in printable document");
-
-// Clean up logo on MasterBank
-$bankModel->updateBank($fblExact['id'], $fblExact['bank_name'], $fblExact['bank_code'], $fblExact['swift_code'], null, true);
+$runner->assert(strpos($printWithLogo, $expectedLogoPath) !== false, "Faysal Print: Utilizes uploaded bank logo in printable document");
 
 // Clean up test account & transactions
 $db->execute("DELETE FROM `transactions` WHERE `account_id` = {$fblAccId}");
@@ -2160,6 +2183,114 @@ $runner->assert(strpos($crossPrint, 'disclaimer-section') !== false && strpos($c
 $db->execute("DELETE FROM `transactions` WHERE `account_id` = {$meezanAccId}");
 $db->execute("DELETE FROM `accounts` WHERE `id` = {$meezanAccId}");
 $runner->assert(true, "Cleanup: Temporary Meezan cross-bank test account #{$meezanAccId} removed");
+
+// =========================================================================
+// SECTION 31: Route Resolution for .php URLs & Direct Page Aliases
+// =========================================================================
+echo "\n--- Section 31: Route Resolution for .php URLs & Direct Page Aliases ---\n";
+
+$testRouter = new Router();
+
+// Register application routes exactly matching public/index.php
+$testRouter->get('/login', 'AuthController@showLogin', ['guest']);
+$testRouter->get('/dashboard', 'DashboardController@index', ['auth']);
+$testRouter->get('/accounts', 'AccountController@index', ['auth']);
+$testRouter->get('/account', 'AccountController@index', ['auth']);
+$testRouter->get('/transactions', 'TransactionController@index', ['auth']);
+$testRouter->get('/transactions/rapid', 'TransactionController@rapid', ['auth']);
+$testRouter->get('/rapid', 'TransactionController@rapid', ['auth']);
+$testRouter->get('/transaction', 'TransactionController@rapid', ['auth']);
+$testRouter->get('/ledger', 'TransactionController@index', ['auth']);
+$testRouter->get('/home', 'TransactionController@rapid', ['auth']);
+$testRouter->get('/templates', 'TemplateController@index', ['auth', 'role.admin']);
+$testRouter->get('/template', 'TemplateController@index', ['auth', 'role.admin']);
+$testRouter->get('/templates/create', 'TemplateController@create', ['auth', 'role.admin']);
+$testRouter->get('/templates/{id}/edit', 'TemplateController@edit', ['auth', 'role.admin']);
+$testRouter->get('/statements', 'StatementController@index', ['auth']);
+$testRouter->get('/statement', 'StatementController@index', ['auth']);
+$testRouter->get('/statements/print', 'StatementController@printView', ['auth']);
+$testRouter->get('/print', 'StatementController@printView', ['auth']);
+$testRouter->get('/banks', 'MasterDataController@index', ['auth', 'role.admin']);
+$testRouter->get('/bank', 'MasterDataController@index', ['auth', 'role.admin']);
+$testRouter->get('/users', 'UserController@index', ['auth', 'role.admin']);
+$testRouter->get('/user', 'UserController@index', ['auth', 'role.admin']);
+
+// 1. Dashboard URL resolution
+$m = $testRouter->matchRoute('GET', '/dashboard.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'DashboardController@index', "Router .php: /dashboard.php maps to DashboardController@index");
+$m = $testRouter->matchRoute('GET', '/dashboard');
+$runner->assert($m !== null && $m['route']['handler'] === 'DashboardController@index', "Router exact: /dashboard maps to DashboardController@index");
+
+// 2. Statements & Print URL resolution
+$m = $testRouter->matchRoute('GET', '/statements.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'StatementController@index', "Router .php: /statements.php maps to StatementController@index");
+$m = $testRouter->matchRoute('GET', '/statement.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'StatementController@index', "Router alias .php: /statement.php maps to StatementController@index");
+$m = $testRouter->matchRoute('GET', '/statements/print.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'StatementController@printView', "Router nested .php: /statements/print.php maps to StatementController@printView");
+$m = $testRouter->matchRoute('GET', '/print.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'StatementController@printView', "Router alias .php: /print.php maps to StatementController@printView");
+
+// 3. Transactions & Rapid Entry URL resolution
+$m = $testRouter->matchRoute('GET', '/transactions/rapid.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@rapid', "Router nested .php: /transactions/rapid.php maps to TransactionController@rapid");
+$m = $testRouter->matchRoute('GET', '/rapid.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@rapid', "Router alias .php: /rapid.php maps to TransactionController@rapid");
+$m = $testRouter->matchRoute('GET', '/transaction.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@rapid', "Router alias .php: /transaction.php maps to TransactionController@rapid");
+$m = $testRouter->matchRoute('GET', '/home.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@rapid', "Router alias .php: /home.php maps to TransactionController@rapid");
+
+// 4. Accounts & Ledger URL resolution
+$m = $testRouter->matchRoute('GET', '/accounts.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'AccountController@index', "Router .php: /accounts.php maps to AccountController@index");
+$m = $testRouter->matchRoute('GET', '/account.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'AccountController@index', "Router alias .php: /account.php maps to AccountController@index");
+$m = $testRouter->matchRoute('GET', '/transactions.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@index', "Router .php: /transactions.php maps to TransactionController@index");
+$m = $testRouter->matchRoute('GET', '/ledger.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TransactionController@index', "Router alias .php: /ledger.php maps to TransactionController@index");
+
+// 5. Banks, Users & Templates URL resolution
+$m = $testRouter->matchRoute('GET', '/banks.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'MasterDataController@index', "Router .php: /banks.php maps to MasterDataController@index");
+$m = $testRouter->matchRoute('GET', '/bank.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'MasterDataController@index', "Router alias .php: /bank.php maps to MasterDataController@index");
+$m = $testRouter->matchRoute('GET', '/users.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'UserController@index', "Router .php: /users.php maps to UserController@index");
+$m = $testRouter->matchRoute('GET', '/templates.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TemplateController@index', "Router .php: /templates.php maps to TemplateController@index");
+$m = $testRouter->matchRoute('GET', '/templates/create.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TemplateController@create', "Router .php: /templates/create.php maps to TemplateController@create");
+$m = $testRouter->matchRoute('GET', '/templates/42/edit.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'TemplateController@edit' && ($m['params']['id'] ?? '') === '42', "Router parameterized .php: /templates/42/edit.php maps to TemplateController@edit with id=42");
+$m = $testRouter->matchRoute('GET', '/login.php');
+$runner->assert($m !== null && $m['route']['handler'] === 'AuthController@showLogin', "Router .php: /login.php maps to AuthController@showLogin");
+
+// =========================================================================
+// SECTION 32: Database Cleanliness, Zero Dummy Residue & User Data Protection
+// =========================================================================
+echo "\n--- Section 32: Database Cleanliness & User Data Protection ---\n";
+
+// 1. Verify zero dummy test banks remain in master_banks
+$pollutingBanks = (int)$db->query("SELECT COUNT(*) FROM `master_banks` WHERE `id` > 27 OR `bank_name` LIKE '%Test%'")->fetchColumn();
+$runner->assert($pollutingBanks === 0, "Cleanliness: Zero dummy test banks remaining in master_banks (Found: {$pollutingBanks})");
+
+// 2. Verify zero dummy test accounts remain in accounts table
+$pollutingAccounts = (int)$db->query("SELECT COUNT(*) FROM `accounts` WHERE `account_title` = '14' OR `bank_name` LIKE '%Test%' OR `account_title` LIKE '%Test%' OR `account_title` LIKE '%Logo%'")->fetchColumn();
+$runner->assert($pollutingAccounts === 0, "Cleanliness: Zero dummy test accounts remaining in accounts (Found: {$pollutingAccounts})");
+
+// 3. Verify zero dummy test templates remain in narration_templates
+$pollutingTemplates = (int)$db->query("SELECT COUNT(*) FROM `narration_templates` WHERE `code` LIKE 'VENDOR_TEST_%' OR `code` LIKE 'TEST_%'")->fetchColumn();
+$runner->assert($pollutingTemplates === 0, "Cleanliness: Zero dummy test templates remaining in narration_templates (Found: {$pollutingTemplates})");
+
+// 4. Verify user's uploaded Faysal Bank logo is 100% intact and preserved
+$currentFbl = $bankModel->find(8);
+$runner->assert(!empty($currentFbl['logo_path']) && file_exists(__DIR__ . '/../public/' . $currentFbl['logo_path']), "Data Protection: User's Faysal Bank logo file exists on disk and is preserved in database ({$currentFbl['logo_path']})");
+
+// 5. Verify real user accounts remain untouched
+$realAccountsCount = (int)$db->query("SELECT COUNT(*) FROM `accounts` WHERE `deleted_at` IS NULL")->fetchColumn();
+$runner->assert($realAccountsCount >= 4, "Data Protection: Real client accounts remain untouched and active (Found: {$realAccountsCount})");
 
 // Summary & Exit
 $success = $runner->summary();

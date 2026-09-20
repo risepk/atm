@@ -1,4 +1,16 @@
-<!-- views/dashboard/admin.php -->
+<!-- 
+================================================================================
+File: views/dashboard/admin.php
+Browser URL: http://localhost/atm/dashboard.php (or /atm/dashboard)
+Description: Administrator Executive Dashboard (سسٹم ایڈمنسٹریٹر کا مرکزی ڈیش بورڈ)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. جب ایڈمن لاگ ان ہوتا ہے تو یہ مرکزی ڈیش بورڈ کھلتا ہے۔
+2. اس سکرین پر سسٹم کی تمام سمری (Total Users, Accounts, Transactions, Balances) نظر آتی ہے۔
+3. یہاں سے فوری طور پر Rapid Transaction (/atm/transactions/rapid.php)، Templates (/atm/templates.php)،
+   Banks (/atm/banks.php) اور Users (/atm/users.php) میں جایا جا سکتا ہے۔
+================================================================================
+-->
 <?php $pageTitle = 'Admin Dashboard'; require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-4">
@@ -24,16 +36,16 @@
                 Comprehensive overview of users, financial balances, transactions, and security audit trails.
             </div>
             <div class="flex items-center space-x-2">
-                <a href="/atm/transactions/rapid" class="win-btn font-bold text-emerald-900">
+                <a href="/atm/transactions/rapid.php" class="win-btn font-bold text-emerald-900">
                     ⚡ Transaction (Rapid Entry)
                 </a>
-                <a href="/atm/templates" class="win-btn font-bold text-purple-900">
+                <a href="/atm/templates.php" class="win-btn font-bold text-purple-900">
                     Templates
                 </a>
-                <a href="/atm/banks" class="win-btn text-gray-800">
+                <a href="/atm/banks.php" class="win-btn text-gray-800">
                     Banks
                 </a>
-                <a href="/atm/users" class="win-btn text-gray-800">
+                <a href="/atm/users.php" class="win-btn text-gray-800">
                     Users
                 </a>
             </div>
@@ -69,7 +81,7 @@
             <div class="p-3">
                 <div class="flex items-center justify-between pb-2 border-b border-[#e2ecf7] mb-2">
                     <span class="font-bold text-xs text-[#1a385f] uppercase tracking-wide">All Accounts</span>
-                    <a href="/atm/accounts" class="win-btn win-btn-sm text-blue-900">Manage Accounts</a>
+                    <a href="/atm/accounts.php" class="win-btn win-btn-sm text-blue-900">Manage Accounts</a>
                 </div>
                 <div class="overflow-x-auto max-h-80">
                     <table class="w-full win-table border-collapse">

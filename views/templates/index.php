@@ -1,4 +1,15 @@
-<!-- views/templates/index.php -->
+<!-- 
+================================================================================
+File: views/templates/index.php
+Browser URL: http://localhost/atm/templates.php (or /atm/template.php)
+Description: Narration Templates Registry (ٹرانزیکشن تفصیلات کے ٹیمپلیٹس)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. یہاں سے آٹو نریشن (Auto Particulars) کے ٹیمپلیٹس اور فارمولے کنفیگر کیے جاتے ہیں۔
+2. "Add New Template" بٹن /atm/templates/create.php پر لے جاتا ہے۔
+3. ہر ٹیمپلیٹ کے سامنے "Edit & Fields" کا بٹن فیلڈز اور پری سیٹس کی سیٹنگ کھولتا ہے۔
+================================================================================
+-->
 <?php $pageTitle = 'Template Management'; require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-4">
@@ -24,7 +35,7 @@
                 Configure database-driven narration patterns and dynamic token fields.
             </div>
             <div class="flex items-center space-x-2">
-                <a href="/atm/templates/create" class="win-btn font-bold text-purple-900">
+                <a href="/atm/templates/create.php" class="win-btn font-bold text-purple-900">
                     + Add New Template
                 </a>
             </div>
@@ -69,7 +80,7 @@
                                 </span>
                             </td>
                             <td class="text-center whitespace-nowrap">
-                                <a href="/atm/templates/<?= $tpl['id'] ?>/edit" class="win-btn win-btn-sm text-blue-900 font-bold">
+                                <a href="/atm/templates/<?= $tpl['id'] ?>/edit.php" class="win-btn win-btn-sm text-blue-900 font-bold">
                                     Edit &amp; Fields
                                 </a>
                             </td>

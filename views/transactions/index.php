@@ -1,4 +1,16 @@
-<!-- views/transactions/index.php -->
+<!-- 
+================================================================================
+File: views/transactions/index.php
+Browser URL: http://localhost/atm/transactions.php (or /atm/ledger.php)
+Description: Transaction Ledger & Financial Journal (ٹرانزیکشن لیجر، سرچ اور ہسٹری)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. اس فائل میں تمام ٹرانزیکشنز کا مکمل کھاتہ (Ledger Journal) ظاہر ہوتا ہے۔
+2. یہاں سے تاریخ، اکاؤنٹ یا کی ورڈ لکھ کر ٹرانزیکشنز تلاش (Filter) کی جا سکتی ہیں۔
+3. ہر ٹرانزیکشن کے آگے "Edit" کا بٹن اسے /atm/transactions/rapid.php میں لوڈ کرتا ہے۔
+4. اوپر "Transaction (Rapid Entry)" کا بٹن /atm/transactions/rapid.php پر لے جاتا ہے۔
+================================================================================
+-->
 <?php 
 $pageTitle = 'Transaction Ledger'; 
 require __DIR__ . '/../layouts/header.php'; 
@@ -28,10 +40,10 @@ require __DIR__ . '/../layouts/navigation.php';
                 Financial Journal: Full audit trail with search, date range filtering, editing, and voiding.
             </div>
             <div class="flex items-center space-x-2">
-                <a href="/atm/transactions/rapid<?= !empty($filters['account_id']) ? '?account_id=' . (int)$filters['account_id'] : '' ?>" class="win-btn font-bold text-emerald-900">
+                <a href="/atm/transactions/rapid.php<?= !empty($filters['account_id']) ? '?account_id=' . (int)$filters['account_id'] : '' ?>" class="win-btn font-bold text-emerald-900">
                     ⚡ Transaction (Rapid Entry)
                 </a>
-                <a href="/atm/statements<?= !empty($filters['account_id']) ? '?account_id=' . (int)$filters['account_id'] : '' ?>" class="win-btn text-blue-900">
+                <a href="/atm/statements.php<?= !empty($filters['account_id']) ? '?account_id=' . (int)$filters['account_id'] : '' ?>" class="win-btn text-blue-900">
                     📊 Statement Generator
                 </a>
             </div>
@@ -39,7 +51,7 @@ require __DIR__ . '/../layouts/navigation.php';
 
         <!-- Desktop Filter Bar -->
         <div class="bg-[#f7fafc] border-b border-[#cbd9e8] p-3">
-            <form method="GET" action="/atm/transactions" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <form method="GET" action="/atm/transactions.php" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                 <div>
                     <label class="block font-bold text-[#1a385f] uppercase mb-1">Account</label>
                     <select name="account_id" class="searchable-select win-input w-full bg-white">
@@ -68,7 +80,7 @@ require __DIR__ . '/../layouts/navigation.php';
                     <div class="flex space-x-1.5">
                         <input type="text" name="search" placeholder="Keywords..." value="<?= e($filters['search'] ?? '') ?>" class="win-input w-full">
                         <button type="submit" class="win-btn font-bold text-blue-900">Filter</button>
-                        <a href="/atm/transactions" class="win-btn text-gray-700">Reset</a>
+                        <a href="/atm/transactions.php" class="win-btn text-gray-700">Reset</a>
                     </div>
                 </div>
             </form>
@@ -123,7 +135,7 @@ require __DIR__ . '/../layouts/navigation.php';
                                 </td>
                                 <td class="text-center space-x-1 whitespace-nowrap">
                                     <?php if ($tx['status'] === 'posted'): ?>
-                                        <a href="/atm/transactions/rapid?account_id=<?= $tx['account_id'] ?>" class="win-btn win-btn-sm text-blue-900" title="Open in TransactionFrm">
+                                        <a href="/atm/transactions/rapid.php?account_id=<?= $tx['account_id'] ?>" class="win-btn win-btn-sm text-blue-900" title="Open in TransactionFrm">
                                             Edit
                                         </a>
                                         <button type="button" onclick="voidTransaction(<?= $tx['id'] ?>)" class="win-btn win-btn-sm text-red-700" title="Void transaction">

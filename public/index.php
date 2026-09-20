@@ -56,6 +56,7 @@ $router->get('/dashboard', 'DashboardController@index', ['auth']);
 
 // Account Routes
 $router->get('/accounts', 'AccountController@index', ['auth']);
+$router->get('/account', 'AccountController@index', ['auth']);
 $router->get('/api/accounts', 'AccountController@apiList', ['auth']);
 $router->post('/api/accounts/save', 'AccountController@apiSave', ['auth', 'csrf']);
 $router->post('/api/accounts/{id}/delete', 'AccountController@apiDelete', ['auth', 'csrf']);
@@ -65,6 +66,11 @@ $router->get('/transactions', 'TransactionController@index', ['auth']);
 $router->get('/transactions/rapid', 'TransactionController@rapid', ['auth']);
 $router->get('/transactions/detailed', 'TransactionController@detailed', ['auth']);
 $router->get('/transactions/create', 'TransactionController@create', ['auth']);
+// Direct single-word aliases (e.g. /rapid.php or /rapid, /transaction.php, /ledger.php)
+$router->get('/rapid', 'TransactionController@rapid', ['auth']);
+$router->get('/transaction', 'TransactionController@rapid', ['auth']);
+$router->get('/ledger', 'TransactionController@index', ['auth']);
+$router->get('/home', 'TransactionController@rapid', ['auth']);
 $router->get('/api/accounts/{id}/recent-transactions', 'TransactionController@apiRecent', ['auth']);
 $router->get('/api/narrations/suggestions', 'TransactionController@apiSuggestions', ['auth']);
 // Point 2: Transaction Editing
@@ -75,6 +81,7 @@ $router->post('/api/transactions/{id}/void', 'TransactionController@apiVoid', ['
 
 // Narration Template Routes (Admin only for mutations)
 $router->get('/templates', 'TemplateController@index', ['auth', 'role.admin']);
+$router->get('/template', 'TemplateController@index', ['auth', 'role.admin']);
 $router->get('/templates/create', 'TemplateController@create', ['auth', 'role.admin']);
 $router->get('/templates/{id}/edit', 'TemplateController@edit', ['auth', 'role.admin']);
 $router->get('/api/templates/active', 'TemplateController@apiActive', ['auth']);
@@ -87,11 +94,14 @@ $router->post('/api/presets/{id}/delete', 'PresetController@apiDelete', ['auth',
 
 // Statements Routes
 $router->get('/statements', 'StatementController@index', ['auth']);
+$router->get('/statement', 'StatementController@index', ['auth']);
 $router->get('/api/statements/generate', 'StatementController@apiGenerate', ['auth']);
 $router->get('/statements/print', 'StatementController@printView', ['auth']);
+$router->get('/print', 'StatementController@printView', ['auth']);
 
 // Master Data & Bank Management Routes
 $router->get('/banks', 'MasterDataController@index', ['auth', 'role.admin']);
+$router->get('/bank', 'MasterDataController@index', ['auth', 'role.admin']);
 $router->get('/api/master/banks', 'MasterDataController@banks', ['auth']);
 $router->get('/api/master/banks/all', 'MasterDataController@allBanks', ['auth', 'role.admin']);
 // Point 12: Dynamic Add Bank (Admin only)
@@ -102,6 +112,7 @@ $router->post('/api/master/generate-value', 'MasterDataController@generateValue'
 
 // Point 18: User Administration Routes (Admin only)
 $router->get('/users', 'UserController@index', ['auth', 'role.admin']);
+$router->get('/user', 'UserController@index', ['auth', 'role.admin']);
 $router->post('/api/users/create', 'UserController@apiCreate', ['auth', 'role.admin', 'csrf']);
 $router->post('/api/users/{id}/update', 'UserController@apiUpdate', ['auth', 'role.admin', 'csrf']);
 $router->post('/api/users/{id}/reset-password', 'UserController@apiResetPassword', ['auth', 'role.admin', 'csrf']);

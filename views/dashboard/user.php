@@ -1,4 +1,16 @@
-<!-- views/dashboard/user.php -->
+<!-- 
+================================================================================
+File: views/dashboard/user.php
+Browser URL: http://localhost/atm/dashboard.php (or /atm/dashboard)
+Description: Operator / User Dashboard (آپریٹر یوزر کا ڈیش بورڈ اور کھاتوں کا جائزہ)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. جب نان ایڈمن یا آپریٹر لاگ ان ہوتا ہے تو یہ ڈیش بورڈ ظاہر ہوتا ہے۔
+2. اس میں صارف کے اکاؤنٹس، بیلنس اور حالیہ ٹرانزیکشنز کا جائزہ ہوتا ہے۔
+3. یہاں سے فوری طور پر Rapid Entry (/atm/transactions/rapid.php) یا Accounts (/atm/accounts.php)
+   اور Statements (/atm/statements.php) پر جایا جا سکتا ہے۔
+================================================================================
+-->
 <?php $pageTitle = 'My Dashboard'; require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-4">
@@ -24,13 +36,13 @@
                 Welcome back, <strong><?= e($currentUser['full_name']) ?></strong>.
             </div>
             <div class="flex items-center space-x-2">
-                <a href="/atm/transactions/rapid" class="win-btn font-bold text-emerald-900">
+                <a href="/atm/transactions/rapid.php" class="win-btn font-bold text-emerald-900">
                     ⚡ Transaction (Rapid Entry)
                 </a>
-                <a href="/atm/accounts" class="win-btn font-bold text-blue-900">
+                <a href="/atm/accounts.php" class="win-btn font-bold text-blue-900">
                     📁 Manage Accounts
                 </a>
-                <a href="/atm/statements" class="win-btn text-gray-800">
+                <a href="/atm/statements.php" class="win-btn text-gray-800">
                     📊 Statement Generator
                 </a>
             </div>
@@ -62,7 +74,7 @@
             <div class="p-3">
                 <div class="flex items-center justify-between pb-2 border-b border-[#e2ecf7] mb-2">
                     <span class="font-bold text-xs text-[#1a385f] uppercase tracking-wide">My Accounts</span>
-                    <a href="/atm/accounts" class="win-btn win-btn-sm text-blue-900">View All</a>
+                    <a href="/atm/accounts.php" class="win-btn win-btn-sm text-blue-900">View All</a>
                 </div>
                 <div class="space-y-1.5 overflow-y-auto max-h-96">
                     <?php if (empty($accounts)): ?>
@@ -81,7 +93,7 @@
                                     <div class="text-xs font-bold font-mono <?= (float)$acc['current_balance'] >= 0 ? 'text-gray-900' : 'text-red-600' ?>">
                                         <?= CurrencyHelper::format($acc['current_balance']) ?>
                                     </div>
-                                    <a href="/atm/transactions/rapid?account_id=<?= $acc['id'] ?>" class="text-[10px] font-bold text-emerald-800 hover:underline">Entry &rarr;</a>
+                                    <a href="/atm/transactions/rapid.php?account_id=<?= $acc['id'] ?>" class="text-[10px] font-bold text-emerald-800 hover:underline">Entry &rarr;</a>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -93,7 +105,7 @@
             <div class="lg:col-span-2 p-3">
                 <div class="flex items-center justify-between pb-2 border-b border-[#e2ecf7] mb-2">
                     <span class="font-bold text-xs text-[#1a385f] uppercase tracking-wide">Recent Transactions</span>
-                    <a href="/atm/transactions" class="win-btn win-btn-sm text-blue-900">Full Journal</a>
+                    <a href="/atm/transactions.php" class="win-btn win-btn-sm text-blue-900">Full Journal</a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full win-table border-collapse">

@@ -1,4 +1,18 @@
-<!-- views/transactions/rapid.php -->
+<!-- 
+================================================================================
+File: views/transactions/rapid.php
+Browser URL: http://localhost/atm/transactions/rapid.php (or /atm/rapid.php)
+Description: TransactionFrm — Rapid Transaction Entry Window (ٹرانزیکشن اندراج فارم)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. یہ فائل روزانہ ٹرانزیکشنز درج کرنے والی مین ونڈو (TransactionFrm) ہے۔
+2. 'Particulars' فیلڈ کو مکمل چوڑائی دی گئی ہے تاکہ لمبی تفصیل (Narration) آسانی سے لکھی جا سکے۔
+3. Particulars فیلڈ کے نیچے چھوٹے بٹنز (IBFT, ATM Cash Withdrawal, Raast وغیرہ) موجود ہیں
+   جن پر کلک کرنے سے آٹو ٹیکسٹ اور ویری ایبلز درج ہو جاتے ہیں۔
+4. اگر آپ نے ان پٹ فیلڈز (Date, Voucher No, Dr/Cr, Balance) یا نیچے حالیہ ٹرانزیکشنز کے ٹیبل
+   کا لے آؤٹ تبدیل کرنا ہو تو اسی فائل کے اندر متعلقہ حصوں کو ایڈٹ کر سکتے ہیں۔
+================================================================================
+-->
 <?php 
 $pageTitle = 'TransactionFrm — Data Entry'; 
 require __DIR__ . '/../layouts/header.php'; 

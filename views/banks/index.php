@@ -1,4 +1,15 @@
-<!-- views/banks/index.php -->
+<!-- 
+================================================================================
+File: views/banks/index.php
+Browser URL: http://localhost/atm/banks.php (or /atm/bank.php)
+Description: Bank Master Registry & Logo Management (بینک رجسٹر اور لوگو اپلوڈ)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. اس سکرین پر تمام بینکس کی لسٹ، نیا بینک شامل کرنے اور لوگو (PNG/JPG) اپلوڈ کرنے کا نظام ہے۔
+2. جو لوگو آپ یہاں اپلوڈ کرتے ہیں، وہ اسٹیٹمنٹس کی پرنٹ رپورٹس میں خودکار لگ جاتا ہے۔
+3. اگر آپ نے بینک ایڈٹ یا لوگو اپلوڈ موڈل میں تبدیلی کرنی ہو تو اسی فائل کے نچلے حصے میں دیکھیں۔
+================================================================================
+-->
 <?php $pageTitle = 'Bank Master Management'; require __DIR__ . '/../layouts/header.php'; require __DIR__ . '/../layouts/navigation.php'; ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-4">

@@ -1,4 +1,17 @@
-<!-- views/statements/view.php -->
+<!-- 
+================================================================================
+File: views/statements/view.php
+Browser URL: http://localhost/atm/statements.php (or /atm/statements)
+Description: Bank Statements Generator Screen (بینک اسٹیٹمنٹس جنریٹر اور فارم)
+--------------------------------------------------------------------------------
+URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
+1. یہ فائل بینک اسٹیٹمنٹ جنریشن کی مرکزی ونڈو (Dialog) ہے۔
+2. یہاں سے صارف اکاؤنٹ منتخب کرتا ہے، تاریخیں درج کرتا ہے اور "Generate Statement" پر کلک کرتا ہے۔
+3. "Print View" بٹن کے ذریعے نیا ٹیب کھلتا ہے جو /atm/statements/print.php پر پرنٹ فارمیٹ کھولتا ہے۔
+4. اگر آپ نے فارم کے فیلڈز (جیسے Account No, IBAN, Address وغیرہ) کا ڈیزائن بدلنا ہو تو
+   اسی فائل کے اندر HTML اور نیچے دیے گئے jQuery اسکرپٹ کو ایڈٹ کریں۔
+================================================================================
+-->
 <?php 
 $pageTitle = 'Bank Statements & Reports'; 
 require __DIR__ . '/../layouts/header.php'; 
@@ -360,7 +373,7 @@ $('#btn-print-view').on('click', function() {
         opening_balance: $('#stmt-opening-balance').val() || ''
     });
 
-    window.open('/atm/statements/print?' + params.toString(), '_blank');
+    window.open('/atm/statements/print.php?' + params.toString(), '_blank');
 });
 
 // Search Tab Ledger Query
