@@ -27,14 +27,15 @@ class Validator {
                     $ruleName = $r;
                 }
 
-                $this->applyRule($field, $val, $ruleName, $params);
+                $this->applyRule($field, $val, $ruleName, $params, $ruleList);
             }
         }
         return empty($this->errors);
     }
 
-    private function applyRule(string $field, $val, string $rule, array $params): void {
+    private function applyRule(string $field, $val, string $rule, array $params, array $fieldRules = []): void {
         $label = ucwords(str_replace('_', ' ', $field));
+        $isExplicitlyNumeric = in_array('numeric', $fieldRules, true);
 
         switch ($rule) {
             case 'required':
@@ -51,18 +52,18 @@ class Validator {
 
             case 'min':
                 $min = (float)($params[0] ?? 0);
-                if (is_numeric($val) && (float)$val < $min) {
+                if ($isExplicitlyNumeric && is_numeric($val) && (float)$val < $min) {
                     $this->addError($field, "{$label} must be at least {$min}.");
-                } elseif (is_string($val) && mb_strlen($val) < $min) {
+                } elseif (!$isExplicitlyNumeric && is_string($val) && mb_strlen($val) < $min) {
                     $this->addError($field, "{$label} must be at least {$min} characters.");
                 }
                 break;
 
             case 'max':
                 $max = (float)($params[0] ?? 0);
-                if (is_numeric($val) && (float)$val > $max) {
+                if ($isExplicitlyNumeric && is_numeric($val) && (float)$val > $max) {
                     $this->addError($field, "{$label} may not be greater than {$max}.");
-                } elseif (is_string($val) && mb_strlen($val) > $max) {
+                } elseif (!$isExplicitlyNumeric && is_string($val) && mb_strlen($val) > $max) {
                     $this->addError($field, "{$label} may not be greater than {$max} characters.");
                 }
                 break;

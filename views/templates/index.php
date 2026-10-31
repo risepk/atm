@@ -47,7 +47,8 @@ URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
                 <thead>
                     <tr>
                         <th style="width: 140px;">Code</th>
-                        <th style="width: 200px;">Template Name</th>
+                        <th style="width: 180px;">Template Name</th>
+                        <th style="width: 160px;">Target Bank</th>
                         <th>Pattern</th>
                         <th style="width: 70px; text-align: center;">Version</th>
                         <th style="width: 80px; text-align: center;">Fields</th>
@@ -64,6 +65,17 @@ URDU GUIDE FOR DEVELOPER (رہنمائی برائے ڈویلپر):
                             <td>
                                 <div class="font-bold text-gray-900"><?= e($tpl['name']) ?></div>
                                 <div class="text-[10px] text-gray-500 capitalize"><?= e($tpl['category']) ?></div>
+                            </td>
+                            <td>
+                                <?php if (!empty($tpl['bank_name'])): ?>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-900 border border-blue-200" title="<?= e($tpl['bank_name']) ?>">
+                                        <?= e($tpl['bank_name']) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+                                        All Banks (Shared)
+                                    </span>
+                                <?php endif; ?>
                             </td>
                             <td class="text-xs font-mono text-gray-700 max-w-md truncate" title="<?= e($tpl['pattern']) ?>">
                                 <?= e($tpl['pattern']) ?>

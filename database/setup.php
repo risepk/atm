@@ -213,7 +213,7 @@ $pdo->exec($schemaSql);
 echo "Executed schema DDL in MariaDB\n";
 
 // Now prepare seeds
-$adminHash = password_hash('Admin@123456', PASSWORD_DEFAULT);
+$adminHash = password_hash('Pakistan@786', PASSWORD_DEFAULT);
 $userHash = password_hash('User@123456', PASSWORD_DEFAULT);
 $now = date('Y-m-d H:i:s');
 

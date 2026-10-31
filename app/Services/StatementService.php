@@ -42,11 +42,88 @@ class StatementService {
         if (!empty($overrides['address'])) {
             $account['address'] = trim((string)$overrides['address']);
         }
-        if (!empty($overrides['account_type'])) {
-            $account['account_type'] = trim((string)$overrides['account_type']);
+        if (isset($overrides['city'])) {
+            $account['city'] = trim((string)$overrides['city']);
         }
-        if (!empty($overrides['iban'])) {
+        if (isset($overrides['postal_code'])) {
+            $account['postal_code'] = trim((string)$overrides['postal_code']);
+        }
+        if (isset($overrides['province_country'])) {
+            $account['province_country'] = trim((string)$overrides['province_country']);
+        }
+        if (isset($overrides['phone1'])) {
+            $account['phone1'] = trim((string)$overrides['phone1']);
+        }
+        if (isset($overrides['phone2'])) {
+            $account['phone2'] = trim((string)$overrides['phone2']);
+        }
+        if (isset($overrides['branch_name'])) {
+            $account['branch_name'] = trim((string)$overrides['branch_name']);
+        }
+        if (isset($overrides['branch_address'])) {
+            $account['branch_address'] = trim((string)$overrides['branch_address']);
+        }
+        if (isset($overrides['old_account_no'])) {
+            $account['old_account_no'] = trim((string)$overrides['old_account_no']);
+        }
+        if (isset($overrides['product'])) {
+            $account['product'] = trim((string)$overrides['product']);
+        }
+        if (isset($overrides['generated_by'])) {
+            $account['generated_by'] = trim((string)$overrides['generated_by']);
+        }
+        if (isset($overrides['print_date'])) {
+            $account['print_date'] = trim((string)$overrides['print_date']);
+        }
+        if (isset($overrides['currency'])) {
+            $account['currency'] = trim((string)$overrides['currency']);
+        }
+        if (isset($overrides['account_status'])) {
+            $account['account_status'] = trim((string)$overrides['account_status']);
+            $account['account_type'] = $account['account_status'];
+        } elseif (isset($overrides['account_type'])) {
+            $account['account_type'] = trim((string)$overrides['account_type']);
+            $account['account_status'] = $account['account_type'];
+        }
+        if (isset($overrides['iban'])) {
             $account['iban'] = trim((string)$overrides['iban']);
+        }
+        if (isset($overrides['frequency'])) {
+            $account['frequency'] = trim((string)$overrides['frequency']);
+        }
+        if (isset($overrides['printing_date'])) {
+            $account['printing_date'] = trim((string)$overrides['printing_date']);
+        }
+        if (isset($overrides['user_code'])) {
+            $account['user_code'] = trim((string)$overrides['user_code']);
+        }
+        if (isset($overrides['printed_on'])) {
+            $account['printed_on'] = trim((string)$overrides['printed_on']);
+        }
+        if (isset($overrides['issuing_branch'])) {
+            $account['issuing_branch'] = trim((string)$overrides['issuing_branch']);
+        }
+        if (isset($overrides['issue_date'])) {
+            $account['issue_date'] = trim((string)$overrides['issue_date']);
+        }
+        if (isset($overrides['statement_title'])) {
+            $account['statement_title'] = trim((string)$overrides['statement_title']);
+        }
+        if (isset($overrides['branch_code'])) {
+            $account['branch_code'] = trim((string)$overrides['branch_code']);
+        }
+        if (isset($overrides['product_type'])) {
+            $account['product_type'] = trim((string)$overrides['product_type']);
+            $account['product'] = $account['product_type'];
+        } elseif (isset($overrides['product'])) {
+            $account['product'] = trim((string)$overrides['product']);
+            $account['product_type'] = $account['product'];
+        }
+        if (isset($overrides['reg_cell_no'])) {
+            $account['reg_cell_no'] = trim((string)$overrides['reg_cell_no']);
+        }
+        if (isset($overrides['cif_no'])) {
+            $account['cif_no'] = trim((string)$overrides['cif_no']);
         }
 
         // Show Online toggle overrides format to 'online'
@@ -57,8 +134,18 @@ class StatementService {
             $lowerBank = strtolower($account['bank_name'] ?? '');
             if (strpos($lowerBank, 'faysal') !== false || strpos($lowerBank, 'faisal') !== false || strpos($lowerBank, 'fbl') !== false) {
                 $formatCode = 'faysal';
+            } elseif (strpos($lowerBank, 'allied') !== false || strpos($lowerBank, 'abl') !== false) {
+                $formatCode = 'allied';
+            } elseif (strpos($lowerBank, 'meezan') !== false || strpos($lowerBank, 'mezn') !== false) {
+                $formatCode = 'meezan';
+            } elseif (strpos($lowerBank, 'metro') !== false || strpos($lowerBank, 'hmb') !== false) {
+                $formatCode = 'habibmetro';
             } elseif (strpos($lowerBank, 'hbl') !== false || strpos($lowerBank, 'habib bank') !== false) {
                 $formatCode = 'hbl';
+            } elseif (strpos($lowerBank, 'islami') !== false || strpos($lowerBank, 'bipl') !== false) {
+                $formatCode = 'bankislami';
+            } elseif (strpos($lowerBank, 'ubl') !== false || strpos($lowerBank, 'united') !== false || strpos($lowerBank, 'ameen') !== false) {
+                $formatCode = 'ubl';
             } else {
                 $formatCode = 'standard';
             }
@@ -74,8 +161,21 @@ class StatementService {
             $account['bank_code'] = null;
         }
 
-        $startDate = $startDate ?: date('Y-m-01');
-        $endDate = $endDate ?: date('Y-m-d');
+        if (!empty($startDate)) {
+            $sTs = strtotime(str_replace('/', '-', trim((string)$startDate)));
+            $startDate = ($sTs !== false) ? date('Y-m-d', $sTs) : trim((string)$startDate);
+        } else {
+            $minTx = $this->txModel->getMinDateForAccount($accountId);
+            $startDate = $minTx ?: date('Y-m-01');
+        }
+
+        if (!empty($endDate)) {
+            $eTs = strtotime(str_replace('/', '-', trim((string)$endDate)));
+            $endDate = ($eTs !== false) ? date('Y-m-d', $eTs) : trim((string)$endDate);
+        } else {
+            $maxTx = $this->txModel->getMaxDateForAccount($accountId);
+            $endDate = ($maxTx && $maxTx > date('Y-m-d')) ? $maxTx : date('Y-m-d');
+        }
 
         // Opening Balance calculation (String Decimal with strict BCMath)
         $initialBalance = CurrencyHelper::normalizeDecimal($account['initial_balance'] ?? '0.00');

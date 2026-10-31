@@ -234,6 +234,10 @@ $(document).ready(function() {
     if (window.NarrationEngine && NarrationEngine.loadMasterBanks) {
         NarrationEngine.loadMasterBanks(masterBanksList);
     }
+    var customTypesList = <?= isset($customTypes) ? json_encode(array_values($customTypes)) : '[]' ?>;
+    if (window.NarrationEngine && NarrationEngine.loadCustomTypes) {
+        NarrationEngine.loadCustomTypes(customTypesList);
+    }
     <?php
     $cleanTemplates = [];
     if (!empty($templates)) {
@@ -246,6 +250,8 @@ $(document).ready(function() {
                     'pattern' => $t['pattern'],
                     'version' => (int)($t['version'] ?? 1),
                     'category' => $t['category'] ?? 'general',
+                    'bank_id' => !empty($t['bank_id']) ? (int)$t['bank_id'] : null,
+                    'bank_name' => $t['bank_name'] ?? null,
                     'fields' => $t['fields'] ?? []
                 ];
             }
@@ -309,8 +315,14 @@ $(document).ready(function() {
         }
         $('#balance-val').text(parseFloat(acc.current_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         loadTransactions(acc.id);
+        renderQuickTemplateChips();
         showToast('Loaded account: ' + acc.account_title + ' (#' + (acc.account_identifier || acc.id) + ')', 'success');
         $('#frm-dr').focus().select();
+    });
+
+    // Re-filter quick chips when Bank Name is selected/changed
+    $('#frm-bank-name').on('change', function() {
+        renderQuickTemplateChips();
     });
 
     // Enter key in Account Number triggers Check
@@ -479,7 +491,21 @@ $(document).ready(function() {
         var isDebit = parseFloat($('#frm-dr').val()) > 0;
         var isCredit = parseFloat($('#frm-cr').val()) > 0;
 
+        // Active bank from current selected account or form bank dropdown
+        var currentBank = currentAccount ? (currentAccount.bank_name || '') : $('#frm-bank-name').val();
+        currentBank = $.trim(currentBank).toLowerCase();
+
         var list = (availableTemplates || []).filter(function(tpl) {
+            // Bank specific filtering:
+            if (tpl.bank_id || tpl.bank_name) {
+                if (!currentBank) return false;
+                var tBank = $.trim(tpl.bank_name || '').toLowerCase();
+                if (tBank && currentBank.indexOf(tBank) === -1 && tBank.indexOf(currentBank) === -1) {
+                    return false;
+                }
+            }
+            // Shared templates (bank_id is null) are always allowed!
+
             var dir = getTemplateDirection(tpl);
             if (isDebit && !isCredit) {
                 return dir === 'debit' || dir === 'both';
@@ -866,7 +892,7 @@ $(document).ready(function() {
         var $tbody = $('#tx-table-body');
         $tbody.html('<tr><td colspan="9" class="text-center py-6 text-gray-400 italic">Loading transactions...</td></tr>');
 
-        $.getJSON('/atm/api/accounts/' + accId + '/recent-transactions', function(res) {
+        $.getJSON('/atm/api/accounts/' + accId + '/recent-transactions?limit=0', function(res) {
             if (res.success && res.data) {
                 cachedTransactions = res.data.transactions || [];
                 renderTable(cachedTransactions);
@@ -897,7 +923,7 @@ $(document).ready(function() {
 
             // Format date string nicely e.g. 23/06/2025 11:24 pm
             var displayDate = tx.transaction_date;
-            if (tx.created_at) {
+/*            if (tx.created_at) {
                 var d = new Date(tx.created_at);
                 if (!isNaN(d.getTime())) {
                     var day = String(d.getDate()).padStart(2, '0');
@@ -909,7 +935,7 @@ $(document).ready(function() {
                     var mins = String(d.getMinutes()).padStart(2, '0');
                     displayDate = day + '/' + mon + '/' + yr + ' ' + hrs + ':' + mins + ' ' + ampm;
                 }
-            }
+            }*/
 
             var $tr = $('<tr>').addClass('cursor-pointer');
             $tr.attr('id', 'row-tx-' + tx.id);

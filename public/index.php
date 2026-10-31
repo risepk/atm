@@ -86,6 +86,9 @@ $router->get('/templates/create', 'TemplateController@create', ['auth', 'role.ad
 $router->get('/templates/{id}/edit', 'TemplateController@edit', ['auth', 'role.admin']);
 $router->get('/api/templates/active', 'TemplateController@apiActive', ['auth']);
 $router->post('/api/templates/save', 'TemplateController@apiSave', ['auth', 'role.admin', 'csrf']);
+$router->get('/api/custom-types', 'TemplateController@apiCustomTypesList', ['auth']);
+$router->post('/api/custom-types/save', 'TemplateController@apiCustomTypesSave', ['auth', 'role.admin', 'csrf']);
+$router->post('/api/custom-types/{id}/delete', 'TemplateController@apiCustomTypesDelete', ['auth', 'role.admin', 'csrf']);
 
 // Presets Routes
 $router->get('/api/templates/{template_id}/presets', 'PresetController@apiGetForTemplate', ['auth']);
@@ -95,6 +98,21 @@ $router->post('/api/presets/{id}/delete', 'PresetController@apiDelete', ['auth',
 // Statements Routes
 $router->get('/statements', 'StatementController@index', ['auth']);
 $router->get('/statement', 'StatementController@index', ['auth']);
+$router->get('/statements/meezan', 'StatementController@meezan', ['auth']);
+$router->get('/meezan', 'StatementController@meezan', ['auth']);
+$router->get('/statements/hbl', 'StatementController@hbl', ['auth']);
+$router->get('/hbl', 'StatementController@hbl', ['auth']);
+$router->get('/statements/habibmetro', 'StatementController@habibmetro', ['auth']);
+$router->get('/habibmetro', 'StatementController@habibmetro', ['auth']);
+$router->get('/hmb', 'StatementController@habibmetro', ['auth']);
+$router->get('/statements/bankislami', 'StatementController@bankislami', ['auth']);
+$router->get('/bankislami', 'StatementController@bankislami', ['auth']);
+$router->get('/bipl', 'StatementController@bankislami', ['auth']);
+$router->get('/islami', 'StatementController@bankislami', ['auth']);
+$router->get('/statements/ubl', 'StatementController@ubl', ['auth']);
+$router->get('/ubl', 'StatementController@ubl', ['auth']);
+$router->get('/ublameen', 'StatementController@ubl', ['auth']);
+$router->get('/ameen', 'StatementController@ubl', ['auth']);
 $router->get('/api/statements/generate', 'StatementController@apiGenerate', ['auth']);
 $router->get('/statements/print', 'StatementController@printView', ['auth']);
 $router->get('/print', 'StatementController@printView', ['auth']);

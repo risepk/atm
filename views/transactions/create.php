@@ -221,9 +221,15 @@
 
 <script>
 window.ATM_TEMPLATES = <?= json_encode($templates, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+window.ATM_CUSTOM_TYPES = <?= json_encode($customTypes ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 </script>
 <script src="/atm/public/assets/js/searchable-select.js"></script>
 <script src="/atm/public/assets/js/narration-engine.js"></script>
+<script>
+if (window.NarrationEngine && NarrationEngine.loadCustomTypes && window.ATM_CUSTOM_TYPES) {
+    NarrationEngine.loadCustomTypes(window.ATM_CUSTOM_TYPES);
+}
+</script>
 <script src="/atm/public/assets/js/transaction-form.js"></script>
 
 <?php require __DIR__ . '/../layouts/footer.php'; ?>

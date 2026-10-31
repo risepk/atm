@@ -51,21 +51,30 @@ class TransactionController extends BaseController {
         $masterBankModel = new MasterBank();
         $masterBanks = $masterBankModel->getAllActive();
 
+        require_once __DIR__ . '/../Models/CustomFieldType.php';
+        $customTypeModel = new CustomFieldType();
+        $customTypes = $customTypeModel->getActiveTypes();
+
         $this->render('transactions/rapid', [
             'accounts' => $accounts,
             'defaultAccountId' => $defaultAccountId,
             'templates' => $templates,
-            'masterBanks' => $masterBanks
+            'masterBanks' => $masterBanks,
+            'customTypes' => $customTypes
         ]);
     }
 
     public function detailed(Request $request): void {
         $accounts = $this->accountService->listAccounts($this->userId(), $this->isAdmin(), false);
         $templates = $this->narrationService->getActiveTemplatesWithFields();
+        require_once __DIR__ . '/../Models/CustomFieldType.php';
+        $customTypeModel = new CustomFieldType();
+        $customTypes = $customTypeModel->getActiveTypes();
 
         $this->render('transactions/create', [
             'accounts' => $accounts,
             'templates' => $templates,
+            'customTypes' => $customTypes,
             'defaultAccountId' => $request->get('account_id')
         ]);
     }
@@ -77,8 +86,9 @@ class TransactionController extends BaseController {
 
     public function apiRecent(Request $request, array $params): void {
         $accountId = (int)($params['id'] ?? 0);
+        $limit = (int)$request->get('limit', 0); // 0 = all transactions
         try {
-            $data = $this->txService->getRecentAccountTransactions($accountId, $this->userId(), $this->isAdmin(), 10);
+            $data = $this->txService->getRecentAccountTransactions($accountId, $this->userId(), $this->isAdmin(), $limit);
             $this->jsonSuccess($data);
         } catch (Exception $e) {
             $this->jsonError($e->getMessage(), null, 400);
@@ -150,12 +160,24 @@ class TransactionController extends BaseController {
         $direction = strtolower(trim($request->get('direction', 'debit')));
 
         // 1. Get matching active templates
+        $account = $accountId > 0 ? (new Account())->find($accountId) : null;
+        $accBankName = strtolower(trim($account['bank_name'] ?? ''));
+
         $templates = $this->narrationService->getActiveTemplatesWithFields();
         $matchingTemplates = [];
         foreach ($templates as $t) {
             if (empty($t['is_active'])) continue;
             // Exclude transient test templates from UI suggestions
             if (strpos($t['code'], 'VENDOR_TEST_') === 0) continue;
+
+            // Bank filtering: if template is bank-specific, only show for matching bank
+            if (!empty($t['bank_id']) || !empty($t['bank_name'])) {
+                if (!$accBankName) continue;
+                $tBankName = strtolower(trim($t['bank_name'] ?? ''));
+                if ($tBankName && strpos($accBankName, $tBankName) === false && strpos($tBankName, $accBankName) === false) {
+                    continue;
+                }
+            }
 
             if ($q !== '') {
                 $haystack = strtolower($t['name'] . ' ' . $t['code'] . ' ' . ($t['category'] ?? '') . ' ' . ($t['description'] ?? '') . ' ' . ($t['pattern'] ?? ''));

@@ -52,8 +52,23 @@ class MasterBank extends BaseModel {
         if (strpos($lower, 'faisal') !== false || strpos($lower, 'faysal') !== false) {
             return $this->findByCode('FBL');
         }
+        if (strpos($lower, 'allied') !== false || strpos($lower, 'abl') !== false) {
+            return $this->findByCode('ABL');
+        }
         if (strpos($lower, 'habib') !== false && strpos($lower, 'metro') === false && strpos($lower, 'bank al') === false) {
             return $this->findByCode('HBL');
+        }
+        if (strpos($lower, 'meezan') !== false || strpos($lower, 'mezn') !== false) {
+            return $this->findByCode('MEEZAN');
+        }
+        if (strpos($lower, 'metro') !== false || strpos($lower, 'hmb') !== false) {
+            return $this->findByCode('HMB');
+        }
+        if (strpos($lower, 'islami') !== false || strpos($lower, 'bipl') !== false) {
+            return $this->findByCode('BIPL');
+        }
+        if (strpos($lower, 'ubl') !== false || strpos($lower, 'united') !== false || strpos($lower, 'ameen') !== false) {
+            return $this->findByCode('UBL');
         }
 
         return null;
@@ -65,8 +80,21 @@ class MasterBank extends BaseModel {
     }
 
     public function findByCode(string $code): ?array {
+        $trimmed = trim($code);
         $sql = "SELECT * FROM `{$this->table}` WHERE LOWER(`bank_code`) = LOWER(?) LIMIT 1";
-        return $this->db->fetchOne($sql, [trim($code)]);
+        $bank = $this->db->fetchOne($sql, [$trimmed]);
+        if ($bank) return $bank;
+
+        if (strtolower($trimmed) === 'habibmetro' || strtolower($trimmed) === 'habib_metro') {
+            return $this->db->fetchOne($sql, ['HMB']);
+        }
+        if (strtolower($trimmed) === 'bankislami' || strtolower($trimmed) === 'islami') {
+            return $this->db->fetchOne($sql, ['BIPL']);
+        }
+        if (strtolower($trimmed) === 'ubl' || strtolower($trimmed) === 'ubl_ameen' || strtolower($trimmed) === 'ameen') {
+            return $this->db->fetchOne($sql, ['UBL']);
+        }
+        return null;
     }
 
     public function findByCodeExcludingId(string $code, int $id): ?array {

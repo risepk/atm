@@ -21,7 +21,7 @@
         <div class="p-5 bg-[#f2f5fa] space-y-4">
             <div class="text-center pb-2 border-b border-[#cbd9e8]">
                 <h1 class="text-lg font-black text-[#173252] tracking-tight">ATM LEDGER</h1>
-                <p class="text-[11px] text-[#2d507b] font-medium">Desktop Financial Management System</p>
+                <p class="text-[11px] text-[#2d507b] font-medium">Web Based Financial Management System</p>
             </div>
 
             <?php if (Session::hasFlash('error')): ?>
@@ -40,33 +40,17 @@
                 <?= CSRF::getField() ?>
                 <div>
                     <label for="login-input" class="block text-xs font-bold text-[#1a385f] uppercase mb-1">Username / Operator ID</label>
-                    <input id="login-input" name="login" type="text" required class="win-input w-full text-xs font-medium" placeholder="Username or Email" value="admin">
+                    <input id="login-input" name="login" type="text" required autofocus class="win-input w-full text-xs font-medium" placeholder="Username or Email" value="" autocomplete="username">
                 </div>
                 <div>
                     <label for="password-input" class="block text-xs font-bold text-[#1a385f] uppercase mb-1">Security Password</label>
-                    <input id="password-input" name="password" type="password" required class="win-input w-full text-xs font-mono font-medium" placeholder="Password" value="Admin@123456">
+                    <input id="password-input" name="password" type="password" required class="win-input w-full text-xs font-mono font-medium" placeholder="Password" value="" autocomplete="current-password">
                 </div>
 
                 <div class="pt-2">
                     <button type="submit" class="win-btn w-full py-1.5 text-xs font-black text-blue-950">
                         Sign In to System
                     </button>
-                </div>
-
-                <div class="p-2.5 bg-[#e4edf7] rounded-xs border border-[#b8cee6] text-[11px] text-[#1a385f] space-y-1 mt-3">
-                    <div class="font-bold uppercase tracking-wider text-[10px] text-[#0f2747] border-b border-[#cbd9e8] pb-1 mb-1">Default Login Credentials:</div>
-                    <div class="flex justify-between items-center">
-                        <span><strong>Administrator:</strong> admin</span>
-                        <span class="font-mono text-gray-700">Admin@123456</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span><strong>Operator 1:</strong> user1</span>
-                        <span class="font-mono text-gray-700">User@123456</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span><strong>Operator 2:</strong> user2</span>
-                        <span class="font-mono text-gray-700">User@123456</span>
-                    </div>
                 </div>
             </form>
         </div>

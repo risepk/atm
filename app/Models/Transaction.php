@@ -99,6 +99,16 @@ class Transaction extends BaseModel {
         return CurrencyHelper::add($initialBalance, $net);
     }
 
+    public function getMaxDateForAccount(int $accountId): ?string {
+        $row = $this->db->fetchOne("SELECT MAX(transaction_date) as max_date FROM `transactions` WHERE `account_id` = ? AND `deleted_at` IS NULL AND `status` = 'posted'", [$accountId]);
+        return $row['max_date'] ?? null;
+    }
+
+    public function getMinDateForAccount(int $accountId): ?string {
+        $row = $this->db->fetchOne("SELECT MIN(transaction_date) as min_date FROM `transactions` WHERE `account_id` = ? AND `deleted_at` IS NULL AND `status` = 'posted'", [$accountId]);
+        return $row['min_date'] ?? null;
+    }
+
     public function getTotals(?int $userId = null): array {
         $where = "WHERE deleted_at IS NULL AND status = 'posted'";
         $params = [];

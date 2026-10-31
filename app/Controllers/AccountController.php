@@ -44,7 +44,7 @@ class AccountController extends BaseController {
         $validator = Validator::make($data);
 
         if (!$validator->validate([
-            'account_title' => 'required|min:1|max:100'
+            'account_title' => 'required'
         ])) {
             $this->jsonError('Validation error', $validator->getFirstErrors(), 422);
         }

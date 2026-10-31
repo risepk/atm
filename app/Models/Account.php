@@ -10,7 +10,9 @@ class Account extends BaseModel {
         $statusClause = $includeInactive ? "" : "AND a.status = 'active'";
         $sql = "SELECT a.*, 
                 COALESCE(SUM(t.credit - t.debit), 0) + a.initial_balance AS current_balance,
-                COUNT(t.id) AS posted_tx_count
+                COUNT(t.id) AS posted_tx_count,
+                MAX(t.transaction_date) AS max_tx_date,
+                MIN(t.transaction_date) AS min_tx_date
                 FROM `accounts` a
                 LEFT JOIN `transactions` t ON t.account_id = a.id AND t.deleted_at IS NULL AND t.status = 'posted'
                 WHERE a.user_id = ? AND a.deleted_at IS NULL {$statusClause}
@@ -23,7 +25,9 @@ class Account extends BaseModel {
         $statusClause = $includeInactive ? "" : "AND a.status = 'active'";
         $sql = "SELECT a.*, u.username, u.full_name AS owner_name,
                 COALESCE(SUM(t.credit - t.debit), 0) + a.initial_balance AS current_balance,
-                COUNT(t.id) AS posted_tx_count
+                COUNT(t.id) AS posted_tx_count,
+                MAX(t.transaction_date) AS max_tx_date,
+                MIN(t.transaction_date) AS min_tx_date
                 FROM `accounts` a
                 INNER JOIN `users` u ON u.id = a.user_id
                 LEFT JOIN `transactions` t ON t.account_id = a.id AND t.deleted_at IS NULL AND t.status = 'posted'
@@ -36,7 +40,9 @@ class Account extends BaseModel {
     public function getAccountWithBalance(int $id): ?array {
         $sql = "SELECT a.*, u.username, u.full_name AS owner_name,
                 COALESCE(SUM(t.credit - t.debit), 0) + a.initial_balance AS current_balance,
-                COUNT(t.id) AS posted_tx_count
+                COUNT(t.id) AS posted_tx_count,
+                MAX(t.transaction_date) AS max_tx_date,
+                MIN(t.transaction_date) AS min_tx_date
                 FROM `accounts` a
                 INNER JOIN `users` u ON u.id = a.user_id
                 LEFT JOIN `transactions` t ON t.account_id = a.id AND t.deleted_at IS NULL AND t.status = 'posted'

@@ -1,5 +1,23 @@
 <?php
 // app/Services/Statement/HBLStatementRenderer.php
+// ================================================================================
+// Habib Bank Limited (HBL) Statement Layout Renderer
+// Strictly replicated from authentic scanned banking terminal printout
+// Reference: media_1790702900738.jpg
+// --------------------------------------------------------------------------------
+// Key Characteristics:
+// 1. Monospaced ASCII dot-matrix layout ('Courier New', Courier, monospace)
+// 2. 111-character fixed-pitch grid with vertical pipe dividers '|' across all lines
+// 3. Header left: YOUR ACCOUNT STATEMENT, FOR THE PERIOD ENDING: MonDD,YYYY TO MonDD,YYYY
+// 4. Customer block: Name, Street/Plaza, Area, City, PK
+// 5. Header right: ACCOUNT NO ... OF, Branch Name, ACCOUNT TYPE, CURRENCY, PRINTING DATE,
+//    FREQUENCY, PAGE NO, USER
+// 6. Brought Forward row on each page with running balance
+// 7. Multi-line transaction narration with vertical pipes '|' preserved on all lines
+// 8. Pagination with 'Continue on next page' and 'End of Statement'
+// 9. Standard regulatory disclaimer: 'This is a system generated account statement and does not require a signature.'
+// 10. Strict omission of digital stamp / signature (reserved for physical client stamping)
+// ================================================================================
 
 require_once __DIR__ . '/StatementRendererInterface.php';
 require_once __DIR__ . '/../../Helpers/CurrencyHelper.php';
@@ -8,6 +26,7 @@ require_once __DIR__ . '/../../Core/Session.php';
 class HBLStatementRenderer implements StatementRendererInterface {
     protected string $formatCode = 'hbl';
     protected string $formatName = 'HBL Statement Layout';
+    protected int $linesPerPage = 51; // Optimized for authentic A4 terminal dot-matrix printout (+7 lines over 44)
 
     public function getSupportedFormatCode(): string {
         return $this->formatCode;
@@ -18,199 +37,517 @@ class HBLStatementRenderer implements StatementRendererInterface {
     }
 
     /**
+     * Format period date string: e.g. '2025-07-01' -> 'JUL01,2025'
+     */
+    protected function formatPeriodDate(?string $dateStr): string {
+        if (!$dateStr) return '';
+        $ts = strtotime($dateStr);
+        if (!$ts) return strtoupper($dateStr);
+        return strtoupper(date('M', $ts)) . date('d,Y', $ts);
+    }
+
+    /**
+     * Format transaction table date column: e.g. '2025-07-01' -> '01JUL25' (7 chars)
+     */
+    protected function formatTransactionDate(?string $dateStr): string {
+        if (!$dateStr) return '       ';
+        $ts = strtotime($dateStr);
+        if (!$ts) return str_pad(substr($dateStr, 0, 7), 7, ' ');
+        return date('d', $ts) . strtoupper(date('M', $ts)) . date('y', $ts);
+    }
+
+    /**
+     * Format printing date: e.g. '10-08-26' (DD-MM-YY)
+     */
+    protected function formatPrintingDate(?string $dateStr): string {
+        if (!empty($dateStr)) {
+            $trimmed = trim($dateStr);
+            if (preg_match('/^\d{2}[-\/]\d{2}[-\/]\d{2}$/', $trimmed)) {
+                return str_replace('/', '-', $trimmed);
+            }
+            $ts = strtotime($trimmed);
+            if ($ts) {
+                return date('d-m-y', $ts);
+            }
+            return $trimmed;
+        }
+        return date('d-m-y');
+    }
+
+    /**
+     * Split narration text into lines of max 47 characters
+     */
+    protected function wrapNarration(string $narration, int $maxLen = 47): array {
+        $rawLines = preg_split('/\r\n|\r|\n/', trim($narration));
+        $lines = [];
+        foreach ($rawLines as $raw) {
+            $raw = trim($raw);
+            if ($raw === '') continue;
+            if (mb_strlen($raw) <= $maxLen) {
+                $lines[] = $raw;
+            } else {
+                $wrapped = wordwrap($raw, $maxLen, "\n", true);
+                foreach (explode("\n", $wrapped) as $w) {
+                    $trimmed = trim($w);
+                    if ($trimmed !== '') {
+                        $lines[] = $trimmed;
+                    }
+                }
+            }
+        }
+        return !empty($lines) ? $lines : [''];
+    }
+
+    /**
+     * Prepare paginated pages of transactions
+     */
+    protected function paginateTransactions(array $transactions, string $openingBalance, int $maxLinesPerPage = 51): array {
+        $pages = [];
+        $currentPageTxs = [];
+        $currentLinesCount = 0;
+        $pageOpeningBalance = $openingBalance;
+        $runningBalance = $openingBalance;
+
+        foreach ($transactions as $tx) {
+            $narrationLines = $this->wrapNarration($tx['narration'] ?? '');
+            $txLineCount = max(1, count($narrationLines));
+
+            // If adding this transaction exceeds max lines and current page already has transactions, push page
+            if (($currentLinesCount + $txLineCount > $maxLinesPerPage) && !empty($currentPageTxs)) {
+                $pages[] = [
+                    'opening_balance' => $pageOpeningBalance,
+                    'closing_balance' => $runningBalance,
+                    'transactions' => $currentPageTxs
+                ];
+                $pageOpeningBalance = $runningBalance;
+                $currentPageTxs = [];
+                $currentLinesCount = 0;
+            }
+
+            $runningBalance = $tx['balance'] ?? $runningBalance;
+            $currentPageTxs[] = $tx;
+            $currentLinesCount += $txLineCount;
+        }
+
+        // Push final page (or empty initial page if no transactions)
+        $pages[] = [
+            'opening_balance' => $pageOpeningBalance,
+            'closing_balance' => $runningBalance,
+            'transactions' => $currentPageTxs
+        ];
+
+        return $pages;
+    }
+
+    /**
+     * Format summary line with fixed indentation and alignment matching authentic HBL terminal output
+     */
+    protected function formatSummaryLine(string $label, string $value, bool $isTrailingMinus = false): string {
+        $indent = str_repeat(' ', 14);
+        $labelPadded = str_pad($label, 32, ' ', STR_PAD_RIGHT);
+        $valClean = $isTrailingMinus ? ltrim(trim($value), '-') : trim($value);
+        $valuePadded = str_pad($valClean, 45, ' ', STR_PAD_LEFT);
+        $suffix = $isTrailingMinus ? '-' : ' ';
+        return $indent . $labelPadded . $valuePadded . $suffix;
+    }
+
+    /**
+     * Generate 111-character ASCII text block for a page of transactions
+     */
+    protected function buildAsciiTable(array $pageTxs, string $pageOpeningBalance, bool $isLastPage, array $summaryData = []): string {
+        $topLine    = str_repeat('-', 111);
+        $headerLine = '|DATE   |VALUE  |PARTICULARS                                    |       DEBIT|       CREDIT|          BALANCE |';
+        $sepLine    = '|-------|-------|-----------------------------------------------|------------|-------------|------------------|';
+
+        $output = [];
+        $output[] = $topLine;
+        $output[] = $headerLine;
+        $output[] = $sepLine;
+
+        // Brought Forward row
+        $bfBalanceFormatted = CurrencyHelper::format($pageOpeningBalance);
+        $bfLine = '|       |       |' 
+                . str_pad('BROUGHT FORWARD', 47, ' ', STR_PAD_RIGHT) 
+                . '|' . str_repeat(' ', 12) 
+                . '|' . str_repeat(' ', 13) 
+                . '|' . str_pad($bfBalanceFormatted, 17, ' ', STR_PAD_LEFT) . ' |';
+        $output[] = $bfLine;
+
+        // Transaction rows
+        foreach ($pageTxs as $tx) {
+            $dateStr = $this->formatTransactionDate($tx['date'] ?? '');
+            $valStr  = '       '; // In authentic HBL terminal statements, VALUE is 7 spaces
+            $narrationLines = $this->wrapNarration($tx['narration'] ?? '');
+
+            $debitVal = CurrencyHelper::comp((string)($tx['debit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['debit']) : '';
+            $creditVal = CurrencyHelper::comp((string)($tx['credit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['credit']) : '';
+            $balVal = CurrencyHelper::format($tx['balance'] ?? '0.00');
+
+            // Line 0
+            $debitCol = !empty($debitVal) ? str_pad($debitVal, 12, ' ', STR_PAD_LEFT) : str_repeat(' ', 12);
+            $creditCol = !empty($creditVal) ? str_pad($creditVal, 13, ' ', STR_PAD_LEFT) : str_repeat(' ', 13);
+            $balCol = str_pad($balVal, 17, ' ', STR_PAD_LEFT) . ' ';
+            $partCol0 = str_pad(mb_substr($narrationLines[0], 0, 47), 47, ' ', STR_PAD_RIGHT);
+
+            $output[] = "|{$dateStr}|{$valStr}|{$partCol0}|{$debitCol}|{$creditCol}|{$balCol}|";
+
+            // Continuation lines
+            for ($k = 1; $k < count($narrationLines); $k++) {
+                $partColK = str_pad(mb_substr($narrationLines[$k], 0, 47), 47, ' ', STR_PAD_RIGHT);
+                $output[] = "|       |       |{$partColK}|            |             |                  |";
+            }
+        }
+
+        // Bottom continuation or end border
+        if (!$isLastPage) {
+            // 45 dashes + Continue on next page + 45 dashes = 111 chars
+            $output[] = str_repeat('-', 45) . 'Continue on next page' . str_repeat('-', 45);
+            $output[] = 'This is a system generated account statement and does not require a signature.';
+        } else {
+            // Table bottom border
+            $output[] = str_repeat('-', 111);
+            $output[] = '';
+
+            // Financial Summary Block matching authentic HBL statement terminal layout
+            $openingFormatted = CurrencyHelper::format($summaryData['opening_balance'] ?? $pageOpeningBalance);
+            $closingFormatted = CurrencyHelper::format($summaryData['closing_balance'] ?? $pageOpeningBalance);
+            $debitFormatted = CurrencyHelper::format($summaryData['total_debit'] ?? '0.00');
+            $creditFormatted = CurrencyHelper::format($summaryData['total_credit'] ?? '0.00');
+            $debitCountVal = (string)($summaryData['debit_count'] ?? 0);
+            $creditCountVal = (string)($summaryData['credit_count'] ?? 0);
+
+            $output[] = $this->formatSummaryLine('Opening balance', $openingFormatted);
+            $output[] = '';
+            $output[] = $this->formatSummaryLine('Total Debit Transactions', $debitCountVal);
+            $output[] = $this->formatSummaryLine('Total Amount Debited', $debitFormatted, true);
+            $output[] = $this->formatSummaryLine('Total Credit Transactions', $creditCountVal);
+            $output[] = $this->formatSummaryLine('Total Amount Credited', $creditFormatted);
+            $output[] = '';
+            $output[] = $this->formatSummaryLine('Closing Balance', $closingFormatted);
+            $output[] = '';
+
+            // 47 dashes + End of Statement + 48 dashes = 111 chars
+            $output[] = str_repeat('-', 47) . 'End of Statement' . str_repeat('-', 48);
+            $output[] = str_repeat(' ', 10) . 'This is a system generated account statement and does not require a signature.';
+        }
+
+        return implode("\n", $output);
+    }
+
+    /**
+     * Shared styles for interactive preview and print
+     */
+    protected function getSharedStyles(): string {
+        return <<<CSS
+        /* HBL Authentic Monospaced Statement Typography */
+        .hbl-statement-wrapper {
+            font-family: 'Courier New', Courier, 'Lucida Console', monospace !important;
+            font-size: 11px;
+            line-height: 1.35;
+            color: #000000;
+            background: #ffffff;
+            width: 100%;
+            max-width: 820px;
+            margin: 0 auto;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .hbl-page {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 10px;
+            margin-bottom: 25px;
+            background: #ffffff;
+            page-break-after: always;
+            break-after: page;
+        }
+        .hbl-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
+            margin-bottom: 0;
+        }
+        .hbl-header-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+        .hbl-hdr-left {
+            width: 53%;
+            text-align: left;
+            text-transform: uppercase;
+        }
+        .hbl-hdr-right {
+            width: 47%;
+            text-align: left;
+        }
+        .hbl-doc-title {
+            font-weight: bold;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .hbl-period-title {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 12px;
+        }
+        .hbl-cust-name {
+            font-weight: bold;
+            font-size: 11.5px;
+            margin-bottom: 1px;
+        }
+        .hbl-cust-line {
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        .hbl-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: inherit;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+        .hbl-meta-table td {
+            padding: 0;
+            vertical-align: top;
+        }
+        .hbl-meta-lbl {
+            width: 125px;
+            white-space: nowrap;
+            font-weight: normal;
+        }
+        .hbl-meta-sep {
+            width: 12px;
+            text-align: center;
+        }
+        .hbl-meta-val {
+            white-space: nowrap;
+        }
+        .hbl-ascii-pre {
+            font-family: 'Courier New', Courier, 'Lucida Console', monospace !important;
+            font-size: 10.5px;
+            line-height: 1.28;
+            color: #000000;
+            background: transparent;
+            margin: 0;
+            padding: 0;
+            white-space: pre;
+            overflow-x: auto;
+            letter-spacing: 0px;
+        }
+CSS;
+    }
+
+    /**
+     * Render document body (pages containing headers and tables)
+     */
+    protected function renderDocumentPages(array $statementData): string {
+        $account = $statementData['account'] ?? [];
+        $transactions = $statementData['transactions'] ?? [];
+        $opening = CurrencyHelper::normalizeDecimal($statementData['opening_balance'] ?? '0.00');
+
+        $startDateFormatted = $this->formatPeriodDate($statementData['start_date'] ?? date('Y-07-01'));
+        $endDateFormatted = $this->formatPeriodDate($statementData['end_date'] ?? date('Y-06-30'));
+        $periodString = "{$startDateFormatted} TO {$endDateFormatted}";
+
+        $accountTitle = htmlspecialchars(strtoupper($account['account_title'] ?? $account['account_identifier'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $accountNumber = htmlspecialchars($account['account_number'] ?? $account['account_identifier'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
+        
+        $branchName = !empty($account['branch_name']) ? htmlspecialchars(strtoupper(trim((string)$account['branch_name'])), ENT_QUOTES, 'UTF-8') : '';
+        $accountType = !empty($account['account_type']) ? htmlspecialchars(trim((string)$account['account_type']), ENT_QUOTES, 'UTF-8') : (!empty($account['account_status']) ? htmlspecialchars(trim((string)$account['account_status']), ENT_QUOTES, 'UTF-8') : '');
+        
+        $currencyRaw = !empty($account['currency']) ? trim((string)$account['currency']) : 'Pakistan Rupee';
+        $currency = (stripos($currencyRaw, 'pak') !== false || strtoupper($currencyRaw) === 'PKR') ? 'Pakistan Rupee' : htmlspecialchars($currencyRaw, ENT_QUOTES, 'UTF-8');
+        
+        $printingDate = $this->formatPrintingDate($account['printing_date'] ?? date('d-m-y'));
+        $frequency = !empty($account['frequency']) ? htmlspecialchars(trim((string)$account['frequency']), ENT_QUOTES, 'UTF-8') : 'INTERIM / DUPLICATE';
+        $userCode = !empty($account['user_code']) ? htmlspecialchars(trim((string)$account['user_code']), ENT_QUOTES, 'UTF-8') : (!empty($account['generated_by']) ? htmlspecialchars(trim((string)$account['generated_by']), ENT_QUOTES, 'UTF-8') : '');
+
+        // Customer Address Lines
+        $addressLines = [];
+        if (!empty($account['address'])) {
+            $rawLines = preg_split('/\r\n|\r|\n/', trim((string)$account['address']));
+            foreach ($rawLines as $l) {
+                $trimmed = trim($l);
+                if ($trimmed !== '') {
+                    $addressLines[] = htmlspecialchars(strtoupper($trimmed), ENT_QUOTES, 'UTF-8');
+                }
+            }
+        }
+        if (empty($addressLines)) {
+            $addressLines = [];
+        } elseif (!in_array(end($addressLines), ['PK', 'PAKISTAN'])) {
+            $addressLines[] = 'PK';
+        }
+
+        // Precompute summary metrics for the entire statement
+        $debitCount = 0;
+        $creditCount = 0;
+        foreach ($transactions as $tx) {
+            if (CurrencyHelper::comp((string)($tx['debit'] ?? 0), '0.00') > 0) {
+                $debitCount++;
+            }
+            if (CurrencyHelper::comp((string)($tx['credit'] ?? 0), '0.00') > 0) {
+                $creditCount++;
+            }
+        }
+        $summaryData = [
+            'opening_balance' => $opening,
+            'closing_balance' => $statementData['closing_balance'] ?? $opening,
+            'total_debit' => $statementData['total_debit'] ?? '0.00',
+            'total_credit' => $statementData['total_credit'] ?? '0.00',
+            'debit_count' => $debitCount,
+            'credit_count' => $creditCount,
+        ];
+
+        // Paginate transactions
+        $pagesData = $this->paginateTransactions($transactions, $opening, $this->linesPerPage);
+        $totalPages = count($pagesData);
+
+        ob_start();
+        ?>
+        <?php foreach ($pagesData as $index => $pData): 
+            $pageNum = $index + 1;
+            $isLastPage = ($pageNum === $totalPages);
+            $pageAscii = $this->buildAsciiTable($pData['transactions'], $pData['opening_balance'], $isLastPage, $summaryData);
+            $safeAscii = htmlspecialchars($pageAscii, ENT_QUOTES, 'UTF-8');
+        ?>
+<div class="hbl-page">
+    <!-- Header Section (Left Customer Info & Right Bank Metadata) -->
+    <div class="hbl-header-grid">
+        <div class="hbl-hdr-left">
+            <div class="hbl-doc-title">YOUR ACCOUNT STATEMENT</div>
+            <div class="hbl-period-title">FOR THE PERIOD ENDING: <?= $periodString ?></div>
+            <div class="hbl-cust-name"><?= $accountTitle ?></div>
+            <?php foreach ($addressLines as $addrLine): ?><div class="hbl-cust-line"><?= $addrLine ?></div><?php endforeach; ?>
+        </div>
+        <div class="hbl-hdr-right">
+            <table class="hbl-meta-table">
+                <tbody>
+                    <tr>
+                        <td class="hbl-meta-lbl">ACCOUNT NO</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $accountNumber ?><?= !empty($branchName) ? ' OF' : '' ?></td>
+                    </tr>
+                    <?php if (!empty($branchName)): ?>
+                    <tr>
+                        <td class="hbl-meta-lbl"></td>
+                        <td class="hbl-meta-sep"></td>
+                        <td class="hbl-meta-val"><?= $branchName ?></td>
+                    </tr>
+                    <?php endif; ?>
+                    <tr><td colspan="3" style="height: 8px;"></td></tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">ACCOUNT TYPE</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $accountType ?></td>
+                    </tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">CURRENCY</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $currency ?></td>
+                    </tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">PRINTING DATE</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $printingDate ?></td>
+                    </tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">FREQUENCY</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $frequency ?></td>
+                    </tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">PAGE NO</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val">&nbsp;&nbsp;<?= $pageNum ?></td>
+                    </tr>
+                    <tr>
+                        <td class="hbl-meta-lbl">USER</td>
+                        <td class="hbl-meta-sep">:</td>
+                        <td class="hbl-meta-val"><?= $userCode ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 111-Character Monospaced ASCII Transaction Table -->
+    <pre class="hbl-ascii-pre"><?= $safeAscii ?></pre>
+</div>
+        <?php endforeach; ?>
+        <?php
+        return trim(ob_get_clean());
+    }
+
+    /**
      * Render statement HTML for interactive screen preview.
      */
     public function renderHtml(array $statementData): string {
-        $account = $statementData['account'] ?? [];
-        $transactions = $statementData['transactions'] ?? [];
         $opening = CurrencyHelper::format($statementData['opening_balance'] ?? '0.00');
         $closing = CurrencyHelper::format($statementData['closing_balance'] ?? '0.00');
         $totalDebit = CurrencyHelper::format($statementData['total_debit'] ?? '0.00');
         $totalCredit = CurrencyHelper::format($statementData['total_credit'] ?? '0.00');
+        $pagesHtml = $this->renderDocumentPages($statementData);
+        $sharedCss = $this->getSharedStyles();
 
-        $startDateFormatted = $this->formatPeriodDate($statementData['start_date'] ?? date('Y-m-01'));
-        $endDateFormatted = $this->formatPeriodDate($statementData['end_date'] ?? date('Y-m-d'));
-        $periodString = "{$startDateFormatted} TO {$endDateFormatted}";
+        ob_start();
+        ?>
+<style>
+<?= $sharedCss . "\n" ?>
+.hbl-preview-shell {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 16px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+</style>
 
-        $bankLogo = $account['bank_logo'] ?? null;
-        $bankName = htmlspecialchars($account['bank_name'] ?? 'Habib Bank Limited', ENT_QUOTES, 'UTF-8');
-        $accountTitle = htmlspecialchars($account['account_title'] ?? '', ENT_QUOTES, 'UTF-8');
-        $accountNumber = htmlspecialchars($account['account_number'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
-        $currencyRaw = $account['currency'] ?? 'PKR';
-        $currencyDisplay = ($currencyRaw === 'PKR') ? 'Pakistani Rupee' : htmlspecialchars($currencyRaw, ENT_QUOTES, 'UTF-8');
-        
-        $printingDate = date('d-m-y');
-        $frequency = 'INTERIM / DUPLICATE';
-        $userIdentifier = htmlspecialchars(Session::get('username') ?: 'USER', ENT_QUOTES, 'UTF-8');
-        $accountType = 'HBL FreedomAccount';
-
-        // Parse optional branch / location info if present
-        $branchInfo = '';
-        if (!empty($account['bank_code'])) {
-            $branchInfo = 'OF ' . htmlspecialchars($account['bank_code'], ENT_QUOTES, 'UTF-8');
-        }
-
-        $addressHtml = $this->renderAddressBlock($account);
-
-        // Logo markup
-        $logoHtml = '';
-        if ($bankLogo) {
-            $logoHtml = '<img src="/atm/public/' . htmlspecialchars($bankLogo, ENT_QUOTES, 'UTF-8') . '" alt="' . $bankName . '" class="h-10 max-w-[160px] object-contain mb-3">';
-        } else {
-            $logoHtml = '<div class="text-xl font-black tracking-wider text-emerald-800 uppercase mb-2">' . $bankName . '</div>';
-        }
-
-        // Build transaction rows
-        $rowsHtml = '';
-        // 1. Brought Forward row
-        $rowsHtml .= '<tr class="bg-gray-50/70 border-b border-gray-200 font-semibold">';
-        $rowsHtml .= '<td class="px-3 py-2 text-center text-gray-500 font-mono text-xs">-</td>';
-        $rowsHtml .= '<td class="px-3 py-2 text-center text-gray-500 font-mono text-xs">-</td>';
-        $rowsHtml .= '<td class="px-3 py-2 text-gray-900 font-mono text-xs uppercase tracking-wide">BROUGHT FORWARD</td>';
-        $rowsHtml .= '<td class="px-3 py-2 text-right text-gray-400 font-mono text-xs">-</td>';
-        $rowsHtml .= '<td class="px-3 py-2 text-right text-gray-400 font-mono text-xs">-</td>';
-        $rowsHtml .= '<td class="px-3 py-2 text-right text-gray-900 font-mono text-xs font-bold">' . $opening . '</td>';
-        $rowsHtml .= '</tr>';
-
-        // 2. Transaction rows
-        foreach ($transactions as $tx) {
-            $date = htmlspecialchars($this->formatDateColumn($tx['date'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $valueDate = $date; // In ATM Ledger, transaction date serves as value date
-            $narration = nl2br(htmlspecialchars($tx['narration'] ?? '', ENT_QUOTES, 'UTF-8'));
-            $debit = CurrencyHelper::comp((string)($tx['debit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['debit']) : '-';
-            $credit = CurrencyHelper::comp((string)($tx['credit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['credit']) : '-';
-            $balance = CurrencyHelper::format($tx['balance'] ?? '0.00');
-
-            $rowsHtml .= '<tr class="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">';
-            $rowsHtml .= '<td class="px-3 py-2 text-gray-800 font-mono text-xs whitespace-nowrap align-top">' . $date . '</td>';
-            $rowsHtml .= '<td class="px-3 py-2 text-gray-700 font-mono text-xs whitespace-nowrap align-top">' . $valueDate . '</td>';
-            $rowsHtml .= '<td class="px-3 py-2 text-gray-900 font-mono text-xs break-words leading-relaxed align-top max-w-md">' . $narration . '</td>';
-            $rowsHtml .= '<td class="px-3 py-2 text-right text-red-600 font-mono text-xs whitespace-nowrap align-top">' . $debit . '</td>';
-            $rowsHtml .= '<td class="px-3 py-2 text-right text-green-600 font-mono text-xs whitespace-nowrap align-top">' . $credit . '</td>';
-            $rowsHtml .= '<td class="px-3 py-2 text-right text-gray-900 font-mono text-xs font-bold whitespace-nowrap align-top">' . $balance . '</td>';
-            $rowsHtml .= '</tr>';
-        }
-
-        return <<<HTML
-<div class="hbl-statement-preview bg-white text-gray-900 font-sans border border-gray-300 rounded-lg p-6 sm:p-8 shadow-sm space-y-6">
-    <!-- Format Badge -->
+<div class="hbl-preview-shell space-y-4">
+    <!-- Format Badge & Quick Info Bar -->
     <div class="flex items-center justify-between pb-3 border-b border-gray-200">
         <div class="flex items-center space-x-2">
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                {$this->formatName}
+                <?= $this->formatName . "\n" ?>
             </span>
-            <span class="text-xs text-gray-500 font-mono">Dense Institutional Layout</span>
+            <span class="text-xs text-gray-500 font-mono">Terminal Fixed-Pitch Layout (111 Cols)</span>
         </div>
         <div class="text-xs text-gray-500 font-mono">
-            Generated: {$printingDate}
+            Zero Signature/Stamp (Ready for Physical Stamping)
         </div>
     </div>
 
-    <!-- Header Section (Sample Reference Structure) -->
-    <div class="pt-2">
-        <div class="flex flex-col md:flex-row md:justify-between items-start gap-6">
-            <!-- Left Header: Document Title & Customer Information -->
-            <div class="w-full md:w-1/2 space-y-3">
-                <div>
-                    <h2 class="text-xl font-black text-gray-900 tracking-tight uppercase">YOUR ACCOUNT STATEMENT</h2>
-                    <div class="text-xs font-bold text-gray-700 font-mono uppercase mt-1">
-                        FOR THE PERIOD ENDING: <span class="text-gray-900 font-black">{$periodString}</span>
-                    </div>
-                </div>
-
-                <div class="pt-2 text-xs font-mono text-gray-800 uppercase leading-relaxed">
-                    <div class="font-extrabold text-sm text-gray-900">{$accountTitle}</div>
-                    {$addressHtml}
-                </div>
-            </div>
-
-            <!-- Right Header: Bank Logo & Dense Account Metadata Table -->
-            <div class="w-full md:w-1/2 flex flex-col items-start md:items-end">
-                {$logoHtml}
-                <div class="w-full max-w-sm bg-gray-50/80 border border-gray-200 rounded p-3 text-xs font-mono">
-                    <table class="w-full text-xs leading-snug">
-                        <tbody>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5 w-32">ACCOUNT NO</td>
-                                <td class="text-gray-900 font-extrabold py-0.5">: {$accountNumber} {$branchInfo}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">ACCOUNT TYPE</td>
-                                <td class="text-gray-800 py-0.5">: {$accountType}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">CURRENCY</td>
-                                <td class="text-gray-800 py-0.5">: {$currencyDisplay}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">PRINTING DATE</td>
-                                <td class="text-gray-800 py-0.5">: {$printingDate}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">FREQUENCY</td>
-                                <td class="text-gray-800 py-0.5">: {$frequency}</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">PAGE NO</td>
-                                <td class="text-gray-800 py-0.5">: 1</td>
-                            </tr>
-                            <tr>
-                                <td class="font-bold text-gray-600 uppercase py-0.5">USER</td>
-                                <td class="text-gray-800 py-0.5">: {$userIdentifier}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Financial Quick Summary Bar -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 border-t border-b border-gray-200 text-xs font-mono">
+    <!-- Quick Financial Summary Bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 border border-gray-200 rounded text-xs font-mono">
         <div>
             <div class="text-gray-500 uppercase font-semibold text-[10px]">Opening Balance</div>
-            <div class="font-bold text-gray-900 text-xs mt-0.5">{$opening}</div>
+            <div class="font-bold text-gray-900 text-xs mt-0.5"><?= $opening ?></div>
         </div>
         <div>
             <div class="text-red-600 uppercase font-semibold text-[10px]">Total Debits</div>
-            <div class="font-bold text-red-600 text-xs mt-0.5">{$totalDebit}</div>
+            <div class="font-bold text-red-600 text-xs mt-0.5"><?= $totalDebit ?></div>
         </div>
         <div>
             <div class="text-green-600 uppercase font-semibold text-[10px]">Total Credits</div>
-            <div class="font-bold text-green-600 text-xs mt-0.5">{$totalCredit}</div>
+            <div class="font-bold text-green-600 text-xs mt-0.5"><?= $totalCredit ?></div>
         </div>
         <div>
             <div class="text-indigo-900 uppercase font-semibold text-[10px]">Closing Balance</div>
-            <div class="font-bold text-indigo-900 text-xs mt-0.5">{$closing}</div>
+            <div class="font-bold text-indigo-900 text-xs mt-0.5"><?= $closing ?></div>
         </div>
     </div>
 
-    <!-- HBL Dense Transaction Table -->
-    <div class="overflow-x-auto border border-gray-300 rounded">
-        <table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-gray-100 border-b border-gray-300 text-gray-800 font-mono uppercase text-[11px]">
-                <tr>
-                    <th class="px-3 py-2.5 font-extrabold w-24">DATE</th>
-                    <th class="px-3 py-2.5 font-extrabold w-24">VALUE</th>
-                    <th class="px-3 py-2.5 font-extrabold">PARTICULARS</th>
-                    <th class="px-3 py-2.5 font-extrabold text-right w-28">DEBIT</th>
-                    <th class="px-3 py-2.5 font-extrabold text-right w-28">CREDIT</th>
-                    <th class="px-3 py-2.5 font-extrabold text-right w-32">BALANCE</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
-                {$rowsHtml}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Footer Disclaimers -->
-    <div class="pt-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs font-mono text-gray-500 gap-2">
-        <div>Continuation on next page</div>
-        <div class="italic">This is a system generated account statement and does not require a signature.</div>
+    <!-- Authentic Document Container -->
+    <div class="hbl-statement-wrapper border border-gray-300 p-4 bg-white overflow-x-auto shadow-xs">
+        <?= $pagesHtml ?>
     </div>
 </div>
-HTML;
+        <?php
+        return trim(ob_get_clean());
     }
 
     /**
@@ -218,97 +555,30 @@ HTML;
      */
     public function renderPrint(array $statementData): string {
         $account = $statementData['account'] ?? [];
-        $transactions = $statementData['transactions'] ?? [];
-        $opening = CurrencyHelper::format($statementData['opening_balance'] ?? '0.00');
-        $closing = CurrencyHelper::format($statementData['closing_balance'] ?? '0.00');
-        $totalDebit = CurrencyHelper::format($statementData['total_debit'] ?? '0.00');
-        $totalCredit = CurrencyHelper::format($statementData['total_credit'] ?? '0.00');
+        $accountTitle = htmlspecialchars($account['account_title'] ?? 'Customer', ENT_QUOTES, 'UTF-8');
+        $pagesHtml = $this->renderDocumentPages($statementData);
+        $sharedCss = $this->getSharedStyles();
 
-        $startDateFormatted = $this->formatPeriodDate($statementData['start_date'] ?? date('Y-m-01'));
-        $endDateFormatted = $this->formatPeriodDate($statementData['end_date'] ?? date('Y-m-d'));
-        $periodString = "{$startDateFormatted} TO {$endDateFormatted}";
-
-        $bankLogo = $account['bank_logo'] ?? null;
-        $bankName = htmlspecialchars($account['bank_name'] ?? 'Habib Bank Limited', ENT_QUOTES, 'UTF-8');
-        $accountTitle = htmlspecialchars($account['account_title'] ?? '', ENT_QUOTES, 'UTF-8');
-        $accountNumber = htmlspecialchars($account['account_number'] ?? 'N/A', ENT_QUOTES, 'UTF-8');
-        $currencyRaw = $account['currency'] ?? 'PKR';
-        $currencyDisplay = ($currencyRaw === 'PKR') ? 'Pakistani Rupee' : htmlspecialchars($currencyRaw, ENT_QUOTES, 'UTF-8');
-        
-        $printingDate = date('d-m-y');
-        $frequency = 'INTERIM / DUPLICATE';
-        $userIdentifier = htmlspecialchars(Session::get('username') ?: 'USER', ENT_QUOTES, 'UTF-8');
-        $accountType = 'HBL FreedomAccount';
-
-        $branchInfo = '';
-        if (!empty($account['bank_code'])) {
-            $branchInfo = 'OF ' . htmlspecialchars($account['bank_code'], ENT_QUOTES, 'UTF-8');
-        }
-
-        $addressHtml = $this->renderAddressBlock($account);
-
-        $logoPrintHtml = '';
-        if ($bankLogo) {
-            $logoPrintHtml = '<img src="/atm/public/' . htmlspecialchars($bankLogo, ENT_QUOTES, 'UTF-8') . '" alt="' . $bankName . '" style="height: 40px; max-width: 150px; object-fit: contain; margin-bottom: 8px;">';
-        } else {
-            $logoPrintHtml = '<div style="font-size: 16px; font-weight: bold; color: #065f46; text-transform: uppercase; margin-bottom: 6px;">' . $bankName . '</div>';
-        }
-
-        // Build table rows
-        $rowsHtml = '';
-        // Brought Forward row
-        $rowsHtml .= '<tr class="hbl-bf-row">';
-        $rowsHtml .= '<td class="text-center">-</td>';
-        $rowsHtml .= '<td class="text-center">-</td>';
-        $rowsHtml .= '<td class="font-bold">BROUGHT FORWARD</td>';
-        $rowsHtml .= '<td class="text-right">-</td>';
-        $rowsHtml .= '<td class="text-right">-</td>';
-        $rowsHtml .= '<td class="text-right font-bold">' . $opening . '</td>';
-        $rowsHtml .= '</tr>';
-
-        foreach ($transactions as $tx) {
-            $date = htmlspecialchars($this->formatDateColumn($tx['date'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $valueDate = $date;
-            $narration = nl2br(htmlspecialchars($tx['narration'] ?? '', ENT_QUOTES, 'UTF-8'));
-            $debit = CurrencyHelper::comp((string)($tx['debit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['debit']) : '';
-            $credit = CurrencyHelper::comp((string)($tx['credit'] ?? 0), '0.00') > 0 ? CurrencyHelper::format($tx['credit']) : '';
-            $balance = CurrencyHelper::format($tx['balance'] ?? '0.00');
-
-            $rowsHtml .= '<tr>';
-            $rowsHtml .= '<td class="align-top nowrap">' . $date . '</td>';
-            $rowsHtml .= '<td class="align-top nowrap">' . $valueDate . '</td>';
-            $rowsHtml .= '<td class="align-top hbl-particulars">' . $narration . '</td>';
-            $rowsHtml .= '<td class="align-top text-right nowrap">' . $debit . '</td>';
-            $rowsHtml .= '<td class="align-top text-right nowrap">' . $credit . '</td>';
-            $rowsHtml .= '<td class="align-top text-right font-bold nowrap">' . $balance . '</td>';
-            $rowsHtml .= '</tr>';
-        }
-
-        return <<<HTML
+        ob_start();
+        ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Account Statement - {$accountTitle}</title>
+    <title>Account Statement — <?= $accountTitle ?></title>
     <style>
         @page {
             size: A4 portrait;
-            margin: 12mm 10mm 15mm 10mm;
-            @bottom-center {
-                content: "Page " counter(page) " of " counter(pages);
-            }
+            margin: 10mm 10mm 10mm 10mm;
         }
         * {
             box-sizing: border-box;
         }
         body {
-            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            line-height: 1.35;
-            color: #111827;
-            background: #fff;
+            background: #ffffff;
             margin: 0;
-            padding: 15px;
+            padding: 10px;
+            color: #000000;
         }
         .no-print {
             margin-bottom: 20px;
@@ -319,6 +589,8 @@ HTML;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
         }
         .btn-print {
             padding: 7px 16px;
@@ -333,274 +605,36 @@ HTML;
         .btn-print:hover {
             background: #065f46;
         }
-        .header-container {
-            width: 100%;
-            border-bottom: 2px solid #000;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
-        }
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .header-table td {
-            vertical-align: top;
-        }
-        .doc-title {
-            font-size: 17px;
-            font-weight: 900;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin: 0 0 4px 0;
-            color: #000;
-        }
-        .period-title {
-            font-size: 11px;
-            font-weight: 700;
-            font-family: 'Courier New', Courier, monospace;
-            text-transform: uppercase;
-            margin-bottom: 14px;
-            color: #1f2937;
-        }
-        .customer-block {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 11px;
-            line-height: 1.4;
-            text-transform: uppercase;
-            color: #111;
-        }
-        .customer-name {
-            font-weight: bold;
-            font-size: 12px;
-        }
-        .meta-table {
-            border-collapse: collapse;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 10.5px;
-            line-height: 1.35;
-        }
-        .meta-table td {
-            padding: 1px 4px;
-        }
-        .meta-label {
-            font-weight: bold;
-            color: #374151;
-            white-space: nowrap;
-        }
-        .meta-val {
-            color: #000;
-        }
-        .hbl-tx-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 10.5px;
-            margin-top: 10px;
-        }
-        .hbl-tx-table thead {
-            display: table-header-group;
-        }
-        .hbl-tx-table th {
-            border-top: 1px solid #000;
-            border-bottom: 1px solid #000;
-            padding: 5px 6px;
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 10px;
-            background: #f9fafb;
-            text-align: left;
-        }
-        .hbl-tx-table td {
-            padding: 4px 6px;
-            border-bottom: 1px dotted #e5e7eb;
-        }
-        .hbl-tx-table tr {
-            page-break-inside: avoid;
-        }
-        .hbl-bf-row td {
-            background-color: #f8fafc;
-            border-bottom: 1px solid #cbd5e1;
-            font-weight: bold;
-        }
-        .align-top {
-            vertical-align: top;
-        }
-        .text-right {
-            text-align: right;
-        }
-        .text-center {
-            text-align: center;
-        }
-        .font-bold {
-            font-weight: bold;
-        }
-        .nowrap {
-            white-space: nowrap;
-        }
-        .hbl-particulars {
-            white-space: normal;
-            word-break: break-word;
-            line-height: 1.35;
-        }
-        .statement-footer {
-            margin-top: 24px;
-            padding-top: 10px;
-            border-top: 1px solid #9ca3af;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 10px;
-            color: #4b5563;
-            display: flex;
-            justify-content: space-between;
-        }
         @media print {
             .no-print {
                 display: none !important;
             }
             body {
-                padding: 0;
+                padding: 0 !important;
+                margin: 0 !important;
             }
-            .hbl-tx-table th {
-                background-color: #f3f4f6 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .hbl-bf-row td {
-                background-color: #f3f4f6 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+            .hbl-page {
+                padding: 0 !important;
+                margin: 0 !important;
             }
         }
+        <?= $sharedCss . "\n" ?>
     </style>
 </head>
 <body>
     <div class="no-print">
         <div>
-            <strong>{$this->formatName}</strong> &bull; Print Preview / Save as PDF
+            <strong><?= $this->formatName ?></strong> &bull; Authentic Terminal Printout (Save as PDF / Print)
         </div>
         <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
     </div>
 
-    <div class="header-container">
-        <table class="header-table">
-            <tr>
-                <td style="width: 55%;">
-                    <div class="doc-title">YOUR ACCOUNT STATEMENT</div>
-                    <div class="period-title">
-                        FOR THE PERIOD ENDING: {$periodString}
-                    </div>
-                    <div class="customer-block">
-                        <div class="customer-name">{$accountTitle}</div>
-                        {$addressHtml}
-                    </div>
-                </td>
-                <td style="width: 45%; text-align: right;">
-                    <div style="display: inline-block; text-align: left;">
-                        <div style="text-align: right;">
-                            {$logoPrintHtml}
-                        </div>
-                        <table class="meta-table">
-                            <tbody>
-                                <tr>
-                                    <td class="meta-label">ACCOUNT NO</td>
-                                    <td class="meta-val">: {$accountNumber} {$branchInfo}</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">ACCOUNT TYPE</td>
-                                    <td class="meta-val">: {$accountType}</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">CURRENCY</td>
-                                    <td class="meta-val">: {$currencyDisplay}</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">PRINTING DATE</td>
-                                    <td class="meta-val">: {$printingDate}</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">FREQUENCY</td>
-                                    <td class="meta-val">: {$frequency}</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">PAGE NO</td>
-                                    <td class="meta-val">: 1</td>
-                                </tr>
-                                <tr>
-                                    <td class="meta-label">USER</td>
-                                    <td class="meta-val">: {$userIdentifier}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <table class="hbl-tx-table">
-        <thead>
-            <tr>
-                <th style="width: 11%;">DATE</th>
-                <th style="width: 11%;">VALUE</th>
-                <th style="width: 44%;">PARTICULARS</th>
-                <th style="width: 11%; text-align: right;">DEBIT</th>
-                <th style="width: 11%; text-align: right;">CREDIT</th>
-                <th style="width: 12%; text-align: right;">BALANCE</th>
-            </tr>
-        </thead>
-        <tbody>
-            {$rowsHtml}
-        </tbody>
-    </table>
-
-    <div class="statement-footer">
-        <div>Continuation on next page</div>
-        <div>This is a system generated account statement and does not require a signature.</div>
+    <div class="hbl-statement-wrapper">
+        <?= $pagesHtml ?>
     </div>
 </body>
 </html>
-HTML;
-    }
-
-    /**
-     * Format a date string to uppercase banking format (e.g. JUL01,2025).
-     */
-    private function formatPeriodDate(string $dateStr): string {
-        $ts = strtotime($dateStr);
-        if (!$ts) {
-            return strtoupper($dateStr);
-        }
-        return strtoupper(date('M d, Y', $ts));
-    }
-
-    /**
-     * Format transaction table date column (e.g. 05-07-25).
-     */
-    private function formatDateColumn(string $dateStr): string {
-        $ts = strtotime($dateStr);
-        if (!$ts) {
-            return $dateStr;
-        }
-        return date('d-m-y', $ts);
-    }
-
-    /**
-     * Render address block cleanly without placeholder leaks.
-     */
-    private function renderAddressBlock(array $account): string {
-        $notes = trim($account['notes'] ?? '');
-        if (empty($notes)) {
-            return '<div class="text-gray-500 italic text-[11px] mt-1">PK</div>';
-        }
-
-        $lines = explode("\n", $notes);
-        $output = '';
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (!empty($line)) {
-                $output .= '<div>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . '</div>';
-            }
-        }
-        $output .= '<div>PK</div>';
-        return $output;
+        <?php
+        return trim(ob_get_clean());
     }
 }

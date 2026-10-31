@@ -100,9 +100,12 @@ $user2 = $userModel->findByUsername('user2');
 // ====================================================
 echo "1. Testing Authentication, Passwords & Session Security:\n";
 
-$loginAdmin = $authService->attempt('admin', 'Admin@123456');
-$runner->assert($loginAdmin['success'] === true, "Admin credentials authenticate successfully");
+$loginAdmin = $authService->attempt('admin', 'Pakistan@786');
+$runner->assert($loginAdmin['success'] === true, "Admin credentials (Pakistan@786) authenticate successfully");
 $runner->assert(Session::get('role') === 'admin', "Admin session role is 'admin'");
+
+$loginOldAdmin = $authService->attempt('admin', 'Admin@123456');
+$runner->assert($loginOldAdmin['success'] === false, "Old default password Admin@123456 strictly rejected");
 
 $loginBad = $authService->attempt('admin', 'WrongPassword123');
 $runner->assert($loginBad['success'] === false, "Bad password rejected");
@@ -812,10 +815,10 @@ $runner->assert($stdRenderer->getSupportedFormatCode() === 'standard', "Statemen
 // Active HBL renderer & deferred bank formats handling
 $hblRenderer = StatementRendererFactory::create('hbl');
 $runner->assert($hblRenderer instanceof HBLStatementRenderer, "Statement Architecture: HBL layout registered as active HBLStatementRenderer");
-$runner->assert(StatementRendererFactory::isDeferred('meezan'), "Statement Architecture: Meezan layout marked as deferred awaiting client sample");
+$runner->assert(StatementRendererFactory::isDeferred('mcb'), "Statement Architecture: MCB layout marked as deferred awaiting client sample");
 
-$meezanFallbackRenderer = StatementRendererFactory::create('meezan');
-$runner->assert($meezanFallbackRenderer instanceof StandardStatementRenderer, "Statement Architecture: Deferred formats safely fall back to StandardStatementRenderer without fatal error");
+$mcbFallbackRenderer = StatementRendererFactory::create('mcb');
+$runner->assert($mcbFallbackRenderer instanceof StandardStatementRenderer, "Statement Architecture: Deferred formats safely fall back to StandardStatementRenderer without fatal error");
 
 // Statement generation with bank logo resolution
 $bankLogoName2 = 'Statement Logo Bank ' . time();
@@ -983,11 +986,11 @@ $runner->assert($allRowsMatched, "Parity: Every individual row debit, credit, an
 $hblHtml = $hblRendererInstance->renderHtml($hblStmt);
 $runner->assert(strpos($hblHtml, 'YOUR ACCOUNT STATEMENT') !== false, "HBL Header: Contains uppercase 'YOUR ACCOUNT STATEMENT'");
 $runner->assert(strpos($hblHtml, 'FOR THE PERIOD ENDING:') !== false, "HBL Header: Contains 'FOR THE PERIOD ENDING:'");
-$runner->assert(strpos($hblHtml, 'Indus Logistics Enterprise') !== false, "HBL Header: Contains dynamic account title 'Indus Logistics Enterprise'");
+$runner->assert(stripos($hblHtml, 'Indus Logistics Enterprise') !== false, "HBL Header: Contains dynamic account title 'Indus Logistics Enterprise'");
 $runner->assert(strpos($hblHtml, '0417-79011691-03') !== false, "HBL Header: Contains dynamic account number");
 $runner->assert(strpos($hblHtml, 'ACCOUNT NO') !== false, "HBL Header: Contains 'ACCOUNT NO' field label");
 $runner->assert(strpos($hblHtml, 'ACCOUNT TYPE') !== false, "HBL Header: Contains 'ACCOUNT TYPE' field label");
-$runner->assert(strpos($hblHtml, 'Pakistani Rupee') !== false, "HBL Header: Contains normalized currency 'Pakistani Rupee'");
+$runner->assert(strpos($hblHtml, 'Pakistan Rupee') !== false || strpos($hblHtml, 'Pakistani Rupee') !== false, "HBL Header: Contains normalized currency 'Pakistan Rupee'");
 $runner->assert(strpos($hblHtml, 'PRINTING DATE') !== false, "HBL Header: Contains 'PRINTING DATE' field label");
 $runner->assert(strpos($hblHtml, 'FREQUENCY') !== false && strpos($hblHtml, 'INTERIM / DUPLICATE') !== false, "HBL Header: Contains 'FREQUENCY' and 'INTERIM / DUPLICATE'");
 $runner->assert(strpos($hblHtml, 'PAGE NO') !== false, "HBL Header: Contains 'PAGE NO' label");
@@ -998,30 +1001,18 @@ $runner->assert(strpos($hblHtml, 'BROUGHT FORWARD') !== false, "HBL Table: First
 $runner->assert(strpos($hblHtml, '100,000.00') !== false, "HBL Table: Brought forward displays formatted opening balance");
 
 // 7. Table columns & Multi-line Particulars
-$runner->assert(strpos($hblHtml, '<th class="px-3 py-2.5 font-extrabold w-24">DATE</th>') !== false, "HBL Table: DATE column present");
-$runner->assert(strpos($hblHtml, '<th class="px-3 py-2.5 font-extrabold w-24">VALUE</th>') !== false, "HBL Table: VALUE column present");
-$runner->assert(strpos($hblHtml, 'PARTICULARS') !== false, "HBL Table: PARTICULARS column present");
-$runner->assert(strpos($hblHtml, 'Funds Transfer<br />') !== false || strpos($hblHtml, "Funds Transfer") !== false, "HBL Narration: Multi-line particulars preserved without truncation");
+$runner->assert(strpos($hblHtml, '|DATE') !== false, "HBL Table: DATE column present in ASCII grid");
+$runner->assert(strpos($hblHtml, '|VALUE') !== false, "HBL Table: VALUE column present in ASCII grid");
+$runner->assert(strpos($hblHtml, 'PARTICULARS') !== false, "HBL Table: PARTICULARS column present in ASCII grid");
+$runner->assert(strpos($hblHtml, 'Funds Transfer') !== false, "HBL Narration: Multi-line particulars preserved without truncation");
 
 // 8. Footers
-$runner->assert(strpos($hblHtml, 'Continuation on next page') !== false, "HBL Footer: Contains 'Continuation on next page'");
+$runner->assert(strpos($hblHtml, 'Continue on next page') !== false || strpos($hblHtml, 'End of Statement') !== false, "HBL Footer: Contains 'Continue on next page' or 'End of Statement'");
 $runner->assert(strpos($hblHtml, 'This is a system generated account statement and does not require a signature.') !== false, "HBL Footer: Contains system-generated non-signature disclaimer");
 
-// 9. Bank Logo & Fallback
-$runner->assert(strpos($hblHtml, '<div class="text-xl font-black tracking-wider text-emerald-800 uppercase mb-2">Habib Bank Limited</div>') !== false, "HBL Logo: Fallback styled bank title renders cleanly when logo_path is null");
-
-// Test with bank logo attached
-$bankWithLogoName3 = 'HBL Logo Test Bank ' . time();
-$bankWithLogoId3 = $bankModel->addBank($bankWithLogoName3, 'HBLB', null, 'uploads/banks/test_hbl_logo.png');
-$accountWithLogo2 = $accountService->createAccount((int)$user1['id'], [
-    'account_title' => 'Logo Verification Co',
-    'bank_name' => $bankWithLogoName3,
-    'account_number' => '0417-11223344-01',
-    'initial_balance' => '5000.00'
-]);
-$stmtWithHblLogo = $stmtService->generateStatement((int)$accountWithLogo2['id'], date('Y-m-01'), date('Y-m-d'), 'hbl', (int)$user1['id'], false);
-$hblHtmlWithLogo = $hblRendererInstance->renderHtml($stmtWithHblLogo);
-$runner->assert(strpos($hblHtmlWithLogo, 'src="/atm/public/uploads/banks/test_hbl_logo.png"') !== false, "HBL Logo: Correctly renders <img> tag when bank logo is present");
+// 9. Format badge and terminal layout metadata
+$runner->assert(strpos($hblHtml, 'HBL Statement Layout') !== false, "HBL Format: Renders authentic 'HBL Statement Layout' badge");
+$runner->assert(strpos($hblHtml, 'Terminal Fixed-Pitch Layout (111 Cols)') !== false, "HBL Layout: Specifies 111 Cols layout metadata");
 
 // 10. XSS Sanitization Safety
 $xssAccount = $accountService->createAccount((int)$user1['id'], [
@@ -1047,16 +1038,15 @@ $runner->assert(strpos($xssHtml, '<img src=x onerror') === false, "HBL Security:
 $hblPrint = $hblRendererInstance->renderPrint($hblStmt);
 $runner->assert(strpos($hblPrint, '<!DOCTYPE html>') !== false, "HBL Print: Produces valid standalone HTML5 document");
 $runner->assert(strpos($hblPrint, 'size: A4 portrait;') !== false, "HBL Print: Stylesheet specifies A4 portrait page size");
-$runner->assert(strpos($hblPrint, 'display: table-header-group;') !== false, "HBL Print: Table thead set to table-header-group for repeating on multi-page print");
-$runner->assert(strpos($hblPrint, 'page-break-inside: avoid;') !== false, "HBL Print: Table rows configured to prevent page break splitting");
+$runner->assert(strpos($hblPrint, 'page-break-after: always;') !== false || strpos($hblPrint, 'break-after: page;') !== false, "HBL Print: Page break configured for multi-page print");
+$runner->assert(strpos($hblPrint, 'hbl-ascii-pre') !== false, "HBL Print: Preformatted ASCII block styled for monospaced print");
 $runner->assert(strpos($hblPrint, 'window.print()') !== false, "HBL Print: Includes interactive Print / Save as PDF trigger");
 $runner->assert(strpos($hblPrint, 'BROUGHT FORWARD') !== false, "HBL Print: Contains BROUGHT FORWARD row with opening balance");
 $runner->assert(strpos($hblPrint, 'This is a system generated account statement and does not require a signature.') !== false, "HBL Print: Contains footer non-signature disclaimer");
 
 // 12. Clean up test accounts
-$db->query("DELETE FROM `transactions` WHERE `account_id` IN ({$hblAccId}, {$accountWithLogo2['id']}, {$xssAccount['id']})");
-$db->query("DELETE FROM `accounts` WHERE `id` IN ({$hblAccId}, {$accountWithLogo2['id']}, {$xssAccount['id']})");
-$db->query("DELETE FROM `master_banks` WHERE `id` = {$bankWithLogoId3}");
+$db->query("DELETE FROM `transactions` WHERE `account_id` IN ({$hblAccId}, {$xssAccount['id']})");
+$db->query("DELETE FROM `accounts` WHERE `id` IN ({$hblAccId}, {$xssAccount['id']})");
 
 // Clean up any other temporary test fixtures created in sections 2, 9, 10, 17
 if (isset($acc1['id'])) {
@@ -2075,7 +2065,7 @@ $printHtml = $faysalRenderer->renderPrint($stmtData);
 $runner->assert(strpos($printHtml, '@page {') !== false && strpos($printHtml, 'size: A4 portrait;') !== false, "Faysal Print: Configures A4 portrait print layout");
 $runner->assert(strpos($printHtml, 'Account Statement') !== false, "Faysal Print: Contains Account Statement title");
 $runner->assert(strpos($printHtml, 'summary-box') !== false, "Faysal Print: Contains account summary box");
-$runner->assert(strpos($printHtml, 'disclaimer-section') !== false && strpos($printHtml, 'ISLAMABAD BRANCH') === false, "Faysal Print: Contains disclaimer section and clean space for physical stamp/sign");
+$runner->assert(strpos($printHtml, 'legal-notice') !== false && strpos($printHtml, 'ISLAMABAD BRANCH') === false, "Faysal Print: Contains disclaimer section and clean space for physical stamp/sign");
 
 // 8. MasterBank Uploaded Logo Utilization Verification (Protects user's real uploaded logo)
 $freshFbl = $bankModel->find($fblExact['id']);
@@ -2167,7 +2157,7 @@ $runner->assert(CurrencyHelper::comp($crossStmt['closing_balance'], '125000.00')
 
 // 4. Verify rendered HTML output contains the overridden details and Faysal template
 $crossHtml = $stmtService->renderHtml($crossStmt);
-$runner->assert(strpos($crossHtml, 'Faysal Bank Statement Layout') !== false, "Cross-Bank HTML: Uses Faysal Bank Statement Layout");
+$runner->assert(strpos($crossHtml, 'faysal-doc') !== false, "Cross-Bank HTML: Uses Faysal Bank Statement Layout");
 $runner->assert(strpos($crossHtml, '02770070000495') !== false, "Cross-Bank HTML: Contains overridden account number");
 $runner->assert(strpos($crossHtml, 'NASR UD DIN KHAN') !== false, "Cross-Bank HTML: Contains overridden title");
 $runner->assert(strpos($crossHtml, 'CROSS-BANK WITHDRAWAL') !== false, "Cross-Bank HTML: Contains transaction from source ledger");
@@ -2177,7 +2167,7 @@ $runner->assert(strpos($crossHtml, 'CROSS-BANK INWARD REMITTANCE') !== false, "C
 $crossPrint = $stmtService->renderPrint($crossStmt);
 $runner->assert(strpos($crossPrint, '02770070000495') !== false, "Cross-Bank Print: Overridden account number present");
 $runner->assert(strpos($crossPrint, 'NASR UD DIN KHAN') !== false, "Cross-Bank Print: Overridden account title present");
-$runner->assert(strpos($crossPrint, 'disclaimer-section') !== false && strpos($crossPrint, 'ISLAMABAD BRANCH') === false, "Cross-Bank Print: Disclaimers present and digital stamp omitted");
+$runner->assert(strpos($crossPrint, 'legal-notice') !== false && strpos($crossPrint, 'ISLAMABAD BRANCH') === false, "Cross-Bank Print: Disclaimers present and digital stamp omitted");
 
 // Cleanup test account and transactions
 $db->execute("DELETE FROM `transactions` WHERE `account_id` = {$meezanAccId}");
@@ -2268,9 +2258,536 @@ $m = $testRouter->matchRoute('GET', '/login.php');
 $runner->assert($m !== null && $m['route']['handler'] === 'AuthController@showLogin', "Router .php: /login.php maps to AuthController@showLogin");
 
 // =========================================================================
-// SECTION 32: Database Cleanliness, Zero Dummy Residue & User Data Protection
+// SECTION 33: ALLIED BANK STATEMENT LAYOUT & MASTER BANK INTEGRATION
 // =========================================================================
-echo "\n--- Section 32: Database Cleanliness & User Data Protection ---\n";
+echo "\n--- 33. ALLIED BANK STATEMENT LAYOUT & MASTER BANK INTEGRATION ---\n";
+
+// 1. Factory & Interface Verification
+$alliedRenderer = StatementRendererFactory::create('allied');
+$runner->assert($alliedRenderer instanceof AlliedStatementRenderer, "Statement Factory: Resolves 'allied' to AlliedStatementRenderer instance");
+$ablRenderer = StatementRendererFactory::create('abl');
+$runner->assert($ablRenderer instanceof AlliedStatementRenderer, "Statement Factory: Resolves 'abl' to AlliedStatementRenderer instance");
+$runner->assert($alliedRenderer->getSupportedFormatCode() === 'allied', "Allied Renderer: Supported format code is 'allied'");
+$runner->assert($alliedRenderer->getFormatName() === 'Allied Bank Statement Layout', "Allied Renderer: Format name is 'Allied Bank Statement Layout'");
+
+// 2. Database Format Record
+$alliedFormatRecord = $stmtFormatModel->findByCode('allied');
+$runner->assert(!empty($alliedFormatRecord) && $alliedFormatRecord['is_active'] == 1, "Database: 'allied' format is registered and active in statement_formats table");
+
+// 3. MasterBank Flexible Lookup (Allied Bank / Allied Bank Limited / ABL)
+$ablExact = $bankModel->findByName('Allied Bank Limited');
+$runner->assert(!empty($ablExact) && $ablExact['bank_code'] === 'ABL', "MasterBank: Finds 'Allied Bank Limited' via exact name");
+$ablFuzzy1 = $bankModel->findByName('Allied Bank');
+$runner->assert(!empty($ablFuzzy1) && $ablFuzzy1['bank_code'] === 'ABL', "MasterBank: Resolves 'Allied Bank' to ABL");
+$ablFuzzy2 = $bankModel->findByName('allied');
+$runner->assert(!empty($ablFuzzy2) && $ablFuzzy2['bank_code'] === 'ABL', "MasterBank: Resolves lowercase 'allied' to ABL");
+$ablCode = $bankModel->findByName('ABL');
+$runner->assert(!empty($ablCode) && $ablCode['id'] === $ablExact['id'], "MasterBank: Resolves 'ABL' code to Allied Bank");
+
+// Clean any previous ABL-001 test account
+$existingAbl = $db->fetchOne("SELECT id FROM accounts WHERE account_identifier = 'ABL-001'");
+if ($existingAbl) {
+    $db->execute("DELETE FROM transactions WHERE account_id = {$existingAbl['id']}");
+    $db->execute("DELETE FROM accounts WHERE id = {$existingAbl['id']}");
+}
+
+// 4. Create Test Allied Bank Account & Post Transactions
+$ablAccount = $accountService->createAccount($adminUser['id'], [
+    'account_identifier' => 'ABL-001',
+    'account_title' => 'FAIZ MUHAMMAD KHAN',
+    'bank_name' => 'Allied Bank Limited',
+    'account_number' => '0020084083500018',
+    'initial_balance' => '2646.75',
+    'currency' => 'PKR',
+    'address' => "FF598 DEANS TRADE CENTER PESHAWAR\nPESHAWAR\nPESHAWAR 25000\nKHYBER.PAKHTOONKHWA PAKISTAN\n03165532889\n03469081669",
+    'account_type' => 'Regular'
+]);
+$ablAccId = $ablAccount['id'];
+$runner->assert($ablAccId > 0, "Account Setup: Created Allied Bank test account (ID #{$ablAccId})");
+
+// Post sample transactions matching client scanned statements
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ablAccId,
+    'transaction_date' => '2026-03-03',
+    'debit' => '0.00',
+    'credit' => '11980.00',
+    'narration' => 'RAAST P2P',
+    'reference_no' => ''
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ablAccId,
+    'transaction_date' => '2026-03-12',
+    'debit' => '50000.00',
+    'credit' => '0.00',
+    'narration' => 'ATM Cash Withdrawal',
+    'reference_no' => '462840'
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ablAccId,
+    'transaction_date' => '2026-03-24',
+    'debit' => '0.00',
+    'credit' => '5000.00',
+    'narration' => '1LINK Inter-Bank FT',
+    'reference_no' => '413728'
+]);
+
+// 5. Generate Statement via StatementService (Auto-detection & explicit selection)
+$stmtDataAuto = $stmtService->generateStatement($ablAccId, '2026-03-01', '2026-09-23', 'auto', $adminUser['id'], true);
+$runner->assert($stmtDataAuto['format']['format_code'] === 'allied', "Statement Service: 'auto' format auto-detects 'allied' layout for Allied Bank account");
+
+$stmtData = $stmtService->generateStatement($ablAccId, '2026-03-01', '2026-09-23', 'allied', $adminUser['id'], true, [
+    'branch_name' => 'DEANS TRADE CENTR PSW',
+    'account_status' => 'Regular'
+]);
+$runner->assert($stmtData['format']['format_code'] === 'allied', "Statement Service: Explicitly selects 'allied' layout");
+$runner->assert(count($stmtData['transactions']) === 3, "Statement Service: Correct transaction count (3)");
+$runner->assert(CurrencyHelper::comp($stmtData['total_debit'], '50000.00') === 0, "Statement Service: Total debit matches 50,000.00");
+$runner->assert(CurrencyHelper::comp($stmtData['total_credit'], '16980.00') === 0, "Statement Service: Total credit matches 16,980.00");
+
+// 6. HTML Rendering Verification
+$htmlOutput = $stmtService->renderHtml($stmtData);
+$runner->assert(strpos($htmlOutput, 'Allied Bank') !== false, "Allied HTML: Contains Allied Bank branding/logo");
+$runner->assert(strpos($htmlOutput, 'FAIZ MUHAMMAD KHAN') !== false, "Allied HTML: Contains Customer Account Title");
+$runner->assert(strpos($htmlOutput, 'DEANS TRADE CENTER PESHAWAR') !== false, "Allied HTML: Contains multi-line customer address");
+$runner->assert(strpos($htmlOutput, 'Branch Name:') !== false && (strpos($htmlOutput, 'MAIN BRANCH') !== false || strpos($htmlOutput, 'DEANS TRADE CENTR PSW') !== false), "Allied HTML: Contains Branch Name");
+$runner->assert(strpos($htmlOutput, 'Statement Period:') !== false && strpos($htmlOutput, '01 MAR 2026 TO 23 SEP 2026') !== false, "Allied HTML: Contains formatted Statement Period");
+$runner->assert(strpos($htmlOutput, 'Account Number:') !== false && strpos($htmlOutput, '0020084083500018') !== false, "Allied HTML: Contains Account Number");
+$runner->assert(strpos($htmlOutput, 'Account Status:') !== false && strpos($htmlOutput, 'Regular') !== false, "Allied HTML: Contains Account Status");
+$runner->assert(strpos($htmlOutput, 'Pakistan Rupee') !== false || strpos($htmlOutput, 'PKR') !== false, "Allied HTML: Contains Currency line");
+$runner->assert(strpos($htmlOutput, 'BALANCE AT PERIOD START :') !== false, "Allied HTML: Contains BALANCE AT PERIOD START on Page 1");
+$runner->assert(strpos($htmlOutput, '2,646.75') !== false, "Allied HTML: Contains formatted opening balance 2,646.75");
+
+// Column headers
+$runner->assert((bool)preg_match('/col-abl-date">\s*DATE\s*</', $htmlOutput), "Allied HTML: Table header contains DATE");
+$runner->assert((bool)preg_match('/col-abl-part">\s*PARTICULARS\s*</', $htmlOutput), "Allied HTML: Table header contains PARTICULARS");
+$runner->assert((bool)preg_match('/col-abl-valdate">\s*VALUE DATE\s*</', $htmlOutput), "Allied HTML: Table header contains VALUE DATE");
+$runner->assert((bool)preg_match('/col-abl-debits[^>]*>\s*DEBITS\s*</', $htmlOutput), "Allied HTML: Table header contains DEBITS");
+$runner->assert((bool)preg_match('/col-abl-credits[^>]*>\s*CREDITS\s*</', $htmlOutput), "Allied HTML: Table header contains CREDITS");
+$runner->assert((bool)preg_match('/col-abl-balance[^>]*>\s*BALANCE\s*</', $htmlOutput), "Allied HTML: Table header contains BALANCE");
+
+// Transactions & references
+$runner->assert(strpos($htmlOutput, '03 MAR 26') !== false, "Allied HTML: Contains formatted uppercase transaction date 03 MAR 26");
+$runner->assert(strpos($htmlOutput, 'RAAST P2P') !== false, "Allied HTML: Contains transaction narration RAAST P2P");
+$runner->assert(stripos($htmlOutput, 'ATM CASH WITHDRAWAL') !== false, "Allied HTML: Contains ATM Cash Withdrawal");
+$runner->assert(strpos($htmlOutput, '462840') !== false, "Allied HTML: Contains ATM reference secondary line 462840");
+$runner->assert(strpos($htmlOutput, '50,000.00') !== false, "Allied HTML: Formatted debit amount 50,000.00 present");
+$runner->assert(strpos($htmlOutput, '11,980.00') !== false, "Allied HTML: Formatted credit amount 11,980.00 present");
+
+// Summary rows
+$runner->assert(strpos($htmlOutput, 'TOTAL DEBIT / CREDIT') !== false, "Allied HTML: Contains TOTAL DEBIT / CREDIT summary row");
+$runner->assert(strpos($htmlOutput, 'CLOSING BALANCE') !== false, "Allied HTML: Contains CLOSING BALANCE summary row");
+$runner->assert(strpos($htmlOutput, 'TOTAL WITHHOLDING TAX DEDUCTED') !== false, "Allied HTML: Contains TOTAL WITHHOLDING TAX DEDUCTED summary row");
+
+// Footers & signature exclusion
+$runner->assert(strpos($htmlOutput, '*REVE- Reversal Entry') !== false, "Allied HTML: Contains *REVE- Reversal Entry disclaimer");
+$runner->assert(strpos($htmlOutput, 'does not require any signature') !== false, "Allied HTML: Contains system generated disclaimer");
+$runner->assert((bool)preg_match('/1\s+of\s+1/', $htmlOutput), "Allied HTML: Single page statement shows '1 of 1'");
+$runner->assert(strpos($htmlOutput, 'data:image/png;base64') === false && strpos($htmlOutput, 'digital-stamp') === false, "Allied HTML: Digital stamp and signature omitted for physical client signing");
+
+// 7. Print Document Verification
+$printOutput = $stmtService->renderPrint($stmtData);
+$runner->assert(strpos($printOutput, 'Account Statement — Allied Bank') !== false, "Allied Print: Document title contains Allied Bank");
+$runner->assert(strpos($printOutput, 'size: A4 portrait') !== false, "Allied Print: Configures A4 portrait print layout");
+$runner->assert(strpos($printOutput, 'Print Preview — Allied Bank Limited (ABL) Account Statement') !== false, "Allied Print: Preview bar present");
+$runner->assert(strpos($printOutput, 'TOTAL DEBIT / CREDIT') !== false, "Allied Print: Summary row present");
+$runner->assert(strpos($printOutput, '*REVE- Reversal Entry') !== false, "Allied Print: Reversal entry disclaimer present");
+
+// 8. Pagination Verification with 32 Transactions (Multi-Page Split)
+for ($i = 4; $i <= 32; $i++) {
+    $txService->createTransaction($adminUser['id'], true, [
+        'account_id' => $ablAccId,
+        'transaction_date' => '2026-04-' . str_pad((string)(($i % 25) + 1), 2, '0', STR_PAD_LEFT),
+        'debit' => '1000.00',
+        'credit' => '0.00',
+        'narration' => 'BATCH TEST TX #' . $i,
+        'reference_no' => 'REF' . $i
+    ]);
+}
+$stmtDataMulti = $stmtService->generateStatement($ablAccId, '2026-03-01', '2026-09-23', 'allied', $adminUser['id'], true);
+$htmlMulti = $stmtService->renderHtml($stmtDataMulti);
+$runner->assert((bool)preg_match('/1\s+of\s+2/', $htmlMulti), "Allied Pagination: Page 1 of 2 footer present for 32 transactions");
+$runner->assert((bool)preg_match('/2\s+of\s+2/', $htmlMulti), "Allied Pagination: Page 2 of 2 footer present for 32 transactions");
+
+// 9. Cross-Bank Ledger Formatting into Allied Bank Layout
+$crossAblAccount = $accountService->createAccount($adminUser['id'], [
+    'account_title' => 'ORIGINAL HOLDER',
+    'bank_name' => 'Meezan Bank Limited',
+    'account_number' => 'MEEZAN-CROSS-01',
+    'initial_balance' => '10000.00',
+    'currency' => 'PKR'
+]);
+$crossAblId = $crossAblAccount['id'];
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $crossAblId,
+    'transaction_date' => '2026-05-01',
+    'debit' => '0.00',
+    'credit' => '25000.00',
+    'narration' => 'CROSS TEST CREDIT'
+]);
+$crossAblStmt = $stmtService->generateStatement($crossAblId, '2026-05-01', '2026-05-30', 'allied', $adminUser['id'], true, [
+    'bank_name' => 'Allied Bank Limited',
+    'account_title' => 'FAIZ MUHAMMAD KHAN',
+    'account_number' => '0020084083500018',
+    'opening_balance' => '5000.00'
+]);
+$runner->assert($crossAblStmt['format']['format_code'] === 'allied', "Allied Cross-Bank: Format is correctly resolved to 'allied'");
+$runner->assert($crossAblStmt['account']['bank_code'] === 'ABL', "Allied Cross-Bank: Bank code resolved to 'ABL'");
+$crossAblHtml = $stmtService->renderHtml($crossAblStmt);
+$runner->assert(strpos($crossAblHtml, 'abl-statement-wrapper') !== false, "Allied Cross-Bank HTML: Uses Allied Bank Statement wrapper");
+$runner->assert(strpos($crossAblHtml, 'FAIZ MUHAMMAD KHAN') !== false, "Allied Cross-Bank HTML: Displays overridden title");
+$runner->assert(strpos($crossAblHtml, 'CROSS TEST CREDIT') !== false, "Allied Cross-Bank HTML: Pulls transaction from source account");
+
+// Cleanup cross account
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$crossAblId}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$crossAblId}");
+
+// 10. Dynamic Form Discrete Field Overrides Verification
+$discreteOverrides = [
+    'account_title' => 'DYNAMIC ABL HOLDER',
+    'address' => 'SUITE 402 COMMERCIAL PLAZA',
+    'city' => 'RAWALPINDI',
+    'postal_code' => '46000',
+    'province_country' => 'PUNJAB PAKISTAN',
+    'phone1' => '03001234567',
+    'phone2' => '03219876543',
+    'branch_name' => 'SADDAR BRANCH RWP',
+    'account_number' => '0010099887766554',
+    'account_status' => 'Active Regular',
+    'currency' => 'Pak Rupee (PKR)',
+    'opening_balance' => '7500.00'
+];
+
+$discreteStmt = $stmtService->generateStatement($ablAccId, '2026-03-01', '2026-09-23', 'allied', $adminUser['id'], true, $discreteOverrides);
+$runner->assert($discreteStmt['account']['city'] === 'RAWALPINDI', "Allied Discrete Overrides: City overridden to 'RAWALPINDI'");
+$runner->assert($discreteStmt['account']['postal_code'] === '46000', "Allied Discrete Overrides: Postal Code overridden to '46000'");
+$runner->assert($discreteStmt['account']['province_country'] === 'PUNJAB PAKISTAN', "Allied Discrete Overrides: Province/Country overridden to 'PUNJAB PAKISTAN'");
+$runner->assert($discreteStmt['account']['phone1'] === '03001234567', "Allied Discrete Overrides: Phone 1 overridden to '03001234567'");
+$runner->assert($discreteStmt['account']['phone2'] === '03219876543', "Allied Discrete Overrides: Phone 2 overridden to '03219876543'");
+$runner->assert($discreteStmt['account']['branch_name'] === 'SADDAR BRANCH RWP', "Allied Discrete Overrides: Branch Name overridden");
+$runner->assert($discreteStmt['account']['account_status'] === 'Active Regular', "Allied Discrete Overrides: Account Status overridden");
+$runner->assert($discreteStmt['account']['currency'] === 'Pak Rupee (PKR)', "Allied Discrete Overrides: Currency overridden");
+
+$discreteHtml = $stmtService->renderHtml($discreteStmt);
+$runner->assert(strpos($discreteHtml, 'DYNAMIC ABL HOLDER') !== false, "Allied Discrete HTML: Contains overridden title");
+$runner->assert(strpos($discreteHtml, 'SUITE 402 COMMERCIAL PLAZA') !== false, "Allied Discrete HTML: Contains overridden address line");
+$runner->assert(strpos($discreteHtml, 'RAWALPINDI') !== false, "Allied Discrete HTML: Contains overridden city");
+$runner->assert(strpos($discreteHtml, '46000') !== false, "Allied Discrete HTML: Contains overridden postal code");
+$runner->assert(strpos($discreteHtml, 'PUNJAB PAKISTAN') !== false, "Allied Discrete HTML: Contains overridden province/country");
+$runner->assert(strpos($discreteHtml, '03001234567') !== false, "Allied Discrete HTML: Contains overridden phone 1");
+$runner->assert(strpos($discreteHtml, '03219876543') !== false, "Allied Discrete HTML: Contains overridden phone 2");
+$runner->assert(strpos($discreteHtml, 'SADDAR BRANCH RWP') !== false, "Allied Discrete HTML: Contains overridden branch name");
+$runner->assert(strpos($discreteHtml, 'Active Regular') !== false, "Allied Discrete HTML: Contains overridden account status");
+$runner->assert(strpos($discreteHtml, 'Pak Rupee (PKR)') !== false, "Allied Discrete HTML: Contains overridden currency");
+
+$discretePrint = $stmtService->renderPrint($discreteStmt);
+$runner->assert(strpos($discretePrint, 'RAWALPINDI') !== false, "Allied Discrete Print: Overridden city rendered in print");
+$runner->assert(strpos($discretePrint, '03001234567') !== false, "Allied Discrete Print: Overridden phone rendered in print");
+
+// Cleanup test account and transactions completely
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$ablAccId}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$ablAccId}");
+$runner->assert(true, "Cleanup: Temporary Allied Bank test account #{$ablAccId} safely removed");
+
+// =========================================================================
+// SECTION 33: Meezan Bank Limited Statement Layout & Dedicated Page Verification
+// =========================================================================
+echo "\n--- Section 33: Meezan Bank Statement Layout & Dedicated Page ---\n";
+
+// 1. Database & Factory Format Registration
+$meezanFormat = $stmtFormatModel->findByCode('meezan');
+$runner->assert(!empty($meezanFormat) && (int)$meezanFormat['is_active'] === 1, "Meezan Format: 'meezan' is registered and active in database");
+
+$meezanRenderer = StatementRendererFactory::create('meezan');
+$runner->assert($meezanRenderer instanceof MeezanStatementRenderer, "Meezan Factory: Resolves 'meezan' to MeezanStatementRenderer");
+
+$meznRenderer = StatementRendererFactory::create('mezn');
+$runner->assert($meznRenderer instanceof MeezanStatementRenderer, "Meezan Factory: Resolves alias 'mezn' to MeezanStatementRenderer");
+
+// 2. Existing Formats Isolation
+$fblRenderer = StatementRendererFactory::create('faysal');
+$runner->assert($fblRenderer instanceof FaysalStatementRenderer, "Isolation: Faysal renderer is preserved and unaltered");
+$ablRenderer = StatementRendererFactory::create('allied');
+$runner->assert($ablRenderer instanceof AlliedStatementRenderer, "Isolation: Allied renderer is preserved and unaltered");
+
+// 3. MasterBank Alias Resolution
+$runner->assert(($mb = $bankModel->findByName('Meezan Bank Limited')) && $mb['bank_code'] === 'MEEZAN', "MasterBank: 'Meezan Bank Limited' resolves to 'MEEZAN'");
+$runner->assert(($mb = $bankModel->findByName('meezan')) && $mb['bank_code'] === 'MEEZAN', "MasterBank: 'meezan' resolves to 'MEEZAN'");
+$runner->assert(($mb = $bankModel->findByName('mezn')) && $mb['bank_code'] === 'MEEZAN', "MasterBank: 'mezn' resolves to 'MEEZAN'");
+$runner->assert(($mb = $bankModel->findByName('FBL')) && $mb['bank_code'] === 'FBL', "MasterBank: FBL alias preserved");
+$runner->assert(($mb = $bankModel->findByName('ABL')) && $mb['bank_code'] === 'ABL', "MasterBank: ABL alias preserved");
+
+// 4. Temporary Test Account & Transaction Fixtures for Meezan
+$meezanTestAccount = $accountService->createAccount($adminUser['id'], [
+    'account_title' => 'TEST TRADING CORP',
+    'bank_name' => 'Meezan Bank Limited',
+    'account_number' => '03170105822345',
+    'branch_name' => '0317-JINNAH SUPER BR-ISD',
+    'initial_balance' => '50000.00',
+    'currency' => 'Pakistan Rupee',
+    'account_type' => 'Meezan Rupee Current A/c',
+    'iban' => 'PK75MEZN0003170105822345'
+]);
+$meezanAccId = $meezanTestAccount['id'];
+
+// Transaction 1: Same date (2026-06-01), Debit 34.24
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $meezanAccId,
+    'transaction_date' => '2026-06-01',
+    'debit' => '34.24',
+    'credit' => '0.00',
+    'narration' => 'FED-FED-00000000000003011318001',
+    'reference_no' => 'DOC001'
+]);
+
+// Transaction 2: Same date (2026-06-01), Credit 25000.00
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $meezanAccId,
+    'transaction_date' => '2026-06-01',
+    'debit' => '0.00',
+    'credit' => '25000.00',
+    'narration' => '1Link 1Bill-INV-100234567-CREDIT RECEIPT',
+    'reference_no' => 'DOC002'
+]);
+
+// Transaction 3: Next date (2026-06-02), Debit 10000.00
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $meezanAccId,
+    'transaction_date' => '2026-06-02',
+    'debit' => '10000.00',
+    'credit' => '0.00',
+    'narration' => 'ATM CASH WITHDRAWAL F-7 ISB',
+    'reference_no' => 'DOC003'
+]);
+
+// 5. Statement Generation & Calculation Verification
+$meezanOverrides = [
+    'branch_address' => 'PLOT NO Q-13 COLLAGE ROAD F-7 ISLAMABAD',
+    'old_account_no' => '0101-01010101',
+    'generated_by' => 'MOIN.31188',
+    'print_date' => '05 Oct 2026 15:43:40'
+];
+$meezanStmt = $stmtService->generateStatement($meezanAccId, '2026-06-01', '2026-06-30', 'meezan', $adminUser['id'], true, $meezanOverrides);
+
+$runner->assert($meezanStmt['format']['format_code'] === 'meezan', "Meezan Service: Statement format is 'meezan'");
+$runner->assert(count($meezanStmt['transactions']) === 3, "Meezan Service: 3 transactions fetched");
+$runner->assert(CurrencyHelper::comp($meezanStmt['total_debit'], '10034.24') === 0, "Meezan Service: Total debit is 10,034.24");
+$runner->assert(CurrencyHelper::comp($meezanStmt['total_credit'], '25000.00') === 0, "Meezan Service: Total credit is 25,000.00");
+$runner->assert(CurrencyHelper::comp($meezanStmt['opening_balance'], '50000.00') === 0, "Meezan Service: Opening balance is 50,000.00");
+$runner->assert(CurrencyHelper::comp($meezanStmt['closing_balance'], '64965.76') === 0, "Meezan Service: Closing balance is 64,965.76 (50000 - 34.24 + 25000 - 10000)");
+
+// 6. HTML Rendering Layout Verification
+$meezanHtml = $stmtService->renderHtml($meezanStmt);
+
+// Banners & Header
+$runner->assert(strpos($meezanHtml, 'QUICK ACCOUNT TRANSACTIONS') !== false, "Meezan HTML: Header contains 'QUICK ACCOUNT TRANSACTIONS'");
+$runner->assert(strpos($meezanHtml, 'O P E N I N G') !== false && strpos($meezanHtml, 'B A L A N C E') !== false, "Meezan HTML: Contains Opening Balance banner");
+$runner->assert(strpos($meezanHtml, 'C L O S I N G') !== false && strpos($meezanHtml, 'B A L A N C E') !== false, "Meezan HTML: Contains Closing Balance banner");
+
+// Table Columns with authentic asterisks
+$runner->assert(strpos($meezanHtml, 'Date(DD/MM)') !== false, "Meezan HTML: Table header has Date(DD/MM)");
+$runner->assert(strpos($meezanHtml, '*******Doc.No*******') !== false, "Meezan HTML: Table header has *******Doc.No*******");
+$runner->assert(strpos($meezanHtml, '***Particulars******') !== false, "Meezan HTML: Table header has ***Particulars******");
+$runner->assert(strpos($meezanHtml, '*******Debit********') !== false, "Meezan HTML: Table header has *******Debit********");
+$runner->assert(strpos($meezanHtml, '*******Credit*******') !== false, "Meezan HTML: Table header has *******Credit*******");
+$runner->assert(strpos($meezanHtml, '******Balance*******') !== false, "Meezan HTML: Table header has ******Balance*******");
+
+// Minus Sign on Debits
+$runner->assert(strpos($meezanHtml, '-34.24') !== false, "Meezan HTML: Debit of 34.24 renders with leading minus sign (-34.24)");
+$runner->assert(strpos($meezanHtml, '-10,000.00') !== false, "Meezan HTML: Debit of 10,000.00 renders with leading minus sign (-10,000.00)");
+$runner->assert(strpos($meezanHtml, '25,000.00') !== false, "Meezan HTML: Credit of 25,000.00 renders positive");
+
+// End-of-Date Balance Alignment
+$runner->assert(strpos($meezanHtml, '74,965.76') !== false, "Meezan HTML: End-of-date balance displays 74,965.76 on last transaction of 01/06");
+
+// Summary Box
+$runner->assert(strpos($meezanHtml, 'Total No. of Credit Transaction') !== false && strpos($meezanHtml, 'Total No. of Debit Transaction') !== false, "Meezan HTML: Summary box contains transaction counts");
+$runner->assert(strpos($meezanHtml, 'Total Credit Turnover') !== false && strpos($meezanHtml, 'Total Debit Turnover') !== false, "Meezan HTML: Summary box contains turnover labels");
+$runner->assert(strpos($meezanHtml, '-10,034.24') !== false, "Meezan HTML: Total debit turnover displays leading minus sign (-10,034.24)");
+
+// Boxed Legal Disclaimers (State Bank, ADC, Banking Mohtasib Urdu)
+$runner->assert(strpos($meezanHtml, "SBP's Prudential Regulations") !== false, "Meezan HTML: Disclaimer contains SBP regulations");
+$runner->assert(strpos($meezanHtml, 'Alternate Delivery Channels') !== false, "Meezan HTML: Disclaimer contains ADC holiday processing rule");
+$runner->assert(strpos($meezanHtml, 'within 45 days after date of receipt') !== false, "Meezan HTML: Disclaimer contains 45-day dispute notice");
+$runner->assert(strpos($meezanHtml, 'بینکنگ محتسب پاکستان') !== false, "Meezan HTML: Disclaimer contains Banking Mohtasib Urdu notice");
+
+// Strict Stamp & Signature Exclusion
+$runner->assert(strpos($meezanHtml, 'data:image/png;base64') === false && strpos($meezanHtml, 'digital-stamp') === false, "Meezan HTML: Stamp and digital signature strictly omitted for client stamping");
+
+// 7. Print Document & Overrides Verification
+$meezanPrint = $stmtService->renderPrint($meezanStmt);
+$runner->assert(strpos($meezanPrint, 'Account Statement — Meezan Bank') !== false, "Meezan Print: Title contains Meezan Bank");
+$runner->assert(strpos($meezanPrint, 'size: A4 portrait') !== false, "Meezan Print: Configures A4 portrait print layout");
+$runner->assert(strpos($meezanPrint, 'PLOT NO Q-13 COLLAGE ROAD F-7 ISLAMABAD') !== false, "Meezan Print: Contains overridden branch address");
+$runner->assert(strpos($meezanPrint, '0101-01010101') !== false, "Meezan Print: Contains overridden old account number");
+$runner->assert(strpos($meezanPrint, 'MOIN.31188') !== false, "Meezan Print: Contains overridden generated by code");
+$runner->assert(stripos($meezanPrint, '05 Oct 2026') !== false || stripos($meezanPrint, '05 OCT 2026') !== false, "Meezan Print: Contains overridden print date");
+
+// 8. Dedicated View File Verification
+$dedicatedViewPath = __DIR__ . '/../views/statements/meezan.php';
+$runner->assert(file_exists($dedicatedViewPath), "Dedicated Page: views/statements/meezan.php file exists");
+$dedicatedViewContent = file_get_contents($dedicatedViewPath);
+$runner->assert(strpos($dedicatedViewContent, 'Meezan Bank Limited') !== false, "Dedicated Page: Contains Meezan Bank branding");
+$runner->assert(strpos($dedicatedViewContent, 'meezan-branch-address') !== false, "Dedicated Page: Contains branch address field");
+$runner->assert(strpos($dedicatedViewContent, 'meezan-old-account-no') !== false, "Dedicated Page: Contains old account number field");
+$runner->assert(strpos($dedicatedViewContent, 'meezan-generated-by') !== false, "Dedicated Page: Contains generated by field");
+
+// 9. Teardown: Clean up test account & transactions
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$meezanAccId}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$meezanAccId}");
+$runner->assert(true, "Cleanup: Temporary Meezan Bank test account #{$meezanAccId} safely removed");
+
+// =========================================================================
+// SECTION 34: Habib Bank Limited (HBL) Statement Layout & Dedicated Page
+// =========================================================================
+echo "\n--- Section 34: HBL Statement Layout & Dedicated Page ---\n";
+
+// 1. Format Registration & Factory Resolution
+$hblFormat = $stmtFormatModel->findByCode('hbl');
+$runner->assert($hblFormat && (int)$hblFormat['is_active'] === 1, "HBL Format: 'hbl' is registered and active in database");
+
+$hblRenderer = StatementRendererFactory::create('hbl');
+$runner->assert($hblRenderer instanceof HBLStatementRenderer, "HBL Factory: Resolves 'hbl' to HBLStatementRenderer");
+
+// Factory Isolation: Faysal, Allied, Meezan remain intact
+$runner->assert(StatementRendererFactory::create('faysal') instanceof FaysalStatementRenderer, "Isolation: Faysal renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('allied') instanceof AlliedStatementRenderer, "Isolation: Allied renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('meezan') instanceof MeezanStatementRenderer, "Isolation: Meezan renderer is preserved and unaltered");
+
+// 2. Master Bank Resolution
+$hblMaster = $bankModel->findByName('Habib Bank Limited');
+$runner->assert($hblMaster && $hblMaster['bank_code'] === 'HBL', "MasterBank: 'Habib Bank Limited' resolves to 'HBL'");
+
+// 3. Create Temporary Test Account for HBL
+$hblTestAccount = $accountService->createAccount($adminUser['id'], [
+    'account_title' => 'SS RAHMAN TRADERS',
+    'bank_name' => 'Habib Bank Limited',
+    'account_number' => '0417-79011691-03',
+    'branch_name' => 'PESHAWAR-CITY BRANCH',
+    'initial_balance' => '1048163.34',
+    'currency' => 'Pakistan Rupee',
+    'account_type' => 'HBL FreedomAccount',
+    'address' => "3RD FLOOR WALI YAR PLAZA\nNEAR QAZAFI HOTEL CHOWK YADGAR\nPESHAWAR"
+]);
+$hblAccId = $hblTestAccount['id'];
+
+// Add Transactions matching scanned document
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $hblAccId,
+    'transaction_date' => '2025-07-01',
+    'debit' => '57000.00',
+    'credit' => '0.00',
+    'narration' => "Funds Transfer     2081062036230701\nTO HBL  01567901712603 723979208106\nThru Digital Banking\nPK42HABB0001567901712603 UBAID ULLA",
+    'reference_no' => '2081062036230701'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $hblAccId,
+    'transaction_date' => '2025-07-03',
+    'debit' => '0.00',
+    'credit' => '25000.00',
+    'narration' => "Funds Transfer     SMa412de06a5bcf2\nFR IRFAN ULLAH\nIBAN XXXX-0019\nThru Raast ABPAPKKA030725040307412",
+    'reference_no' => 'SMa412de06a5bcf2'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $hblAccId,
+    'transaction_date' => '2025-07-03',
+    'debit' => '0.00',
+    'credit' => '100000.00',
+    'narration' => "Funds Transfer     SM6f59086a02271a\nFR AMJAD KHAN\nIBAN XXXX-9255\nThru Raast AMEZNPKKA39010102969255",
+    'reference_no' => 'SM6f59086a02271a'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $hblAccId,
+    'transaction_date' => '2025-07-03',
+    'debit' => '28000.00',
+    'credit' => '0.00',
+    'narration' => "Funds Transfer     SM5763e3307adb9b\nTO MUHAMMAD HUSSAIN / MUHAMMAD SOH\nIBAN XXXX-2288\nThru Raast MBMB03040725377209089",
+    'reference_no' => 'SM5763e3307adb9b'
+]);
+
+// 4. Statement Service Resolution & Calculation
+$hblStmt = $stmtService->generateStatement($hblAccId, '2025-07-01', '2026-06-30', 'auto', $adminUser['id'], true, [
+    'branch_name' => 'PESHAWAR-CITY BRANCH',
+    'frequency' => 'INTERIM / DUPLICATE',
+    'printing_date' => '10-08-26',
+    'user_code' => 'APR801'
+]);
+$runner->assert($hblStmt['format']['format_code'] === 'hbl', "HBL Service: Statement format is correctly resolved to 'hbl'");
+$runner->assert(count($hblStmt['transactions']) === 4, "HBL Service: 4 transactions fetched");
+$runner->assert(CurrencyHelper::comp($hblStmt['total_debit'], '85000.00') === 0, "HBL Service: Total debit is 85,000.00 (57000 + 28000)");
+$runner->assert(CurrencyHelper::comp($hblStmt['total_credit'], '125000.00') === 0, "HBL Service: Total credit is 125,000.00 (25000 + 100000)");
+$runner->assert(CurrencyHelper::comp($hblStmt['opening_balance'], '1048163.34') === 0, "HBL Service: Opening balance matches 1,048,163.34");
+$runner->assert(CurrencyHelper::comp($hblStmt['closing_balance'], '1088163.34') === 0, "HBL Service: Closing balance matches 1,088,163.34 (1048163.34 - 85000 + 125000)");
+
+// 5. HTML Document Verification (Monospace Dot-Matrix Formatting)
+$hblHtml = $stmtService->renderHtml($hblStmt);
+$runner->assert(strpos($hblHtml, 'YOUR ACCOUNT STATEMENT') !== false, "HBL HTML: Header contains 'YOUR ACCOUNT STATEMENT'");
+$runner->assert(strpos($hblHtml, 'JUL01,2025 TO JUN30,2026') !== false, "HBL HTML: Period formatted as 'JUL01,2025 TO JUN30,2026'");
+$runner->assert(strpos($hblHtml, 'SS RAHMAN TRADERS') !== false, "HBL HTML: Customer title present in uppercase");
+$runner->assert(strpos($hblHtml, 'PESHAWAR') !== false && strpos($hblHtml, 'PK') !== false, "HBL HTML: Customer address city and PK present");
+$runner->assert(strpos($hblHtml, '0417-79011691-03 OF') !== false, "HBL HTML: Account No formatted with ' OF'");
+$runner->assert(strpos($hblHtml, 'PESHAWAR-CITY BRANCH') !== false, "HBL HTML: Branch name present under Account No");
+$runner->assert(strpos($hblHtml, 'HBL FreedomAccount') !== false, "HBL HTML: Account Type displays 'HBL FreedomAccount'");
+$runner->assert(strpos($hblHtml, 'Pakistan Rupee') !== false, "HBL HTML: Currency displays 'Pakistan Rupee'");
+$runner->assert(strpos($hblHtml, '10-08-26') !== false, "HBL HTML: Printing date displays '10-08-26'");
+$runner->assert(strpos($hblHtml, 'INTERIM / DUPLICATE') !== false, "HBL HTML: Frequency displays 'INTERIM / DUPLICATE'");
+$runner->assert(strpos($hblHtml, 'APR801') !== false, "HBL HTML: User code displays 'APR801'");
+
+// Table Headers and Pipes
+$runner->assert(strpos($hblHtml, '|DATE   |VALUE  |PARTICULARS') !== false, "HBL HTML: Table header has '|DATE   |VALUE  |PARTICULARS'");
+$runner->assert(strpos($hblHtml, '|       DEBIT|       CREDIT|          BALANCE |') !== false, "HBL HTML: Table header has '|       DEBIT|       CREDIT|          BALANCE |'");
+$runner->assert(strpos($hblHtml, '|-------|-------|-----------------------------------------------|------------|-------------|------------------|') !== false, "HBL HTML: Separator row has 111-character pipe grid");
+$runner->assert(strpos($hblHtml, 'BROUGHT FORWARD') !== false, "HBL HTML: Table contains 'BROUGHT FORWARD' row");
+$runner->assert(strpos($hblHtml, '1,048,163.34') !== false, "HBL HTML: Brought forward row displays opening balance 1,048,163.34");
+
+// Multi-line continuation with vertical pipes
+$runner->assert(strpos($hblHtml, '|01JUL25|       |Funds Transfer     2081062036230701') !== false, "HBL HTML: Line 1 of transaction has date '01JUL25'");
+$runner->assert(strpos($hblHtml, '|       |       |TO HBL  01567901712603 723979208106') !== false, "HBL HTML: Line 2 preserves vertical pipes |       |       |");
+$runner->assert(strpos($hblHtml, '|       |       |Thru Digital Banking') !== false, "HBL HTML: Line 3 preserves vertical pipes");
+$runner->assert(strpos($hblHtml, '57,000.00') !== false, "HBL HTML: Debit amount 57,000.00 formatted cleanly");
+$runner->assert(strpos($hblHtml, 'Opening balance') !== false && strpos($hblHtml, '1,048,163.34') !== false, "HBL HTML: Summary contains Opening balance 1,048,163.34");
+$runner->assert(strpos($hblHtml, 'Total Debit Transactions') !== false && (bool)preg_match('/Total Debit Transactions\s+2\s/', $hblHtml), "HBL HTML: Summary contains Total Debit Transactions count 2");
+$runner->assert(strpos($hblHtml, 'Total Amount Debited') !== false && strpos($hblHtml, '85,000.00-') !== false, "HBL HTML: Summary contains Total Amount Debited with trailing minus 85,000.00-");
+$runner->assert(strpos($hblHtml, 'Total Credit Transactions') !== false && (bool)preg_match('/Total Credit Transactions\s+2\s/', $hblHtml), "HBL HTML: Summary contains Total Credit Transactions count 2");
+$runner->assert(strpos($hblHtml, 'Total Amount Credited') !== false && strpos($hblHtml, '125,000.00') !== false, "HBL HTML: Summary contains Total Amount Credited 125,000.00");
+$runner->assert(strpos($hblHtml, 'Closing Balance') !== false && strpos($hblHtml, '1,088,163.34') !== false, "HBL HTML: Summary contains Closing Balance 1,088,163.34");
+$runner->assert(strpos($hblHtml, 'End of Statement') !== false, "HBL HTML: Footer contains 'End of Statement'");
+$runner->assert(strpos($hblHtml, 'This is a system generated account statement and does not require a signature.') !== false, "HBL HTML: Disclaimer present");
+
+// Zero stamp & signature
+$runner->assert(strpos($hblHtml, 'data:image/png;base64') === false && strpos($hblHtml, 'digital-stamp') === false, "HBL HTML: Stamp and digital signature strictly omitted for client stamping");
+
+// 6. Print Document Verification
+$hblPrint = $stmtService->renderPrint($hblStmt);
+$runner->assert(strpos($hblPrint, 'Account Statement — SS RAHMAN TRADERS') !== false, "HBL Print: Title contains customer name");
+$runner->assert(strpos($hblPrint, 'size: A4 portrait') !== false, "HBL Print: Configures A4 portrait print layout");
+$runner->assert(strpos($hblPrint, 'btn-print') !== false, "HBL Print: Contains print button toolbar");
+$runner->assert(strpos($hblPrint, 'hbl-ascii-pre') !== false, "HBL Print: Uses authentic monospaced pre block");
+
+// 7. Dedicated View Page Verification
+$dedicatedHblPath = __DIR__ . '/../views/statements/hbl.php';
+$runner->assert(file_exists($dedicatedHblPath), "Dedicated Page: views/statements/hbl.php file exists");
+$dedicatedHblContent = file_get_contents($dedicatedHblPath);
+$runner->assert(strpos($dedicatedHblContent, 'Habib Bank Limited') !== false, "Dedicated Page: Contains HBL branding");
+$runner->assert(strpos($dedicatedHblContent, 'hbl-branch-name') !== false, "Dedicated Page: Contains branch name field");
+$runner->assert(strpos($dedicatedHblContent, 'hbl-printing-date') !== false, "Dedicated Page: Contains printing date field");
+$runner->assert(strpos($dedicatedHblContent, 'hbl-frequency') !== false, "Dedicated Page: Contains frequency field");
+$runner->assert(strpos($dedicatedHblContent, 'hbl-user-code') !== false, "Dedicated Page: Contains user code field");
+
+// 8. Router routes check
+$routerIndex = file_get_contents(__DIR__ . '/../public/index.php');
+$runner->assert(strpos($routerIndex, "'/statements/hbl'") !== false && strpos($routerIndex, "'/hbl'") !== false, "Router: /statements/hbl and /hbl routes registered");
+
+// 9. Teardown: Clean up test account & transactions
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$hblAccId}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$hblAccId}");
+$runner->assert(true, "Cleanup: Temporary HBL test account #{$hblAccId} safely removed");
+
+// =========================================================================
+// SECTION 35: Database Cleanliness, Zero Dummy Residue & User Data Protection
+// =========================================================================
+echo "\n--- Section 35: Database Cleanliness & User Data Protection ---\n";
 
 // 1. Verify zero dummy test banks remain in master_banks
 $pollutingBanks = (int)$db->query("SELECT COUNT(*) FROM `master_banks` WHERE `id` > 27 OR `bank_name` LIKE '%Test%'")->fetchColumn();
@@ -2291,6 +2808,441 @@ $runner->assert(!empty($currentFbl['logo_path']) && file_exists(__DIR__ . '/../p
 // 5. Verify real user accounts remain untouched
 $realAccountsCount = (int)$db->query("SELECT COUNT(*) FROM `accounts` WHERE `deleted_at` IS NULL")->fetchColumn();
 $runner->assert($realAccountsCount >= 4, "Data Protection: Real client accounts remain untouched and active (Found: {$realAccountsCount})");
+
+// =========================================================================
+// SECTION 36: Production Deployment Readiness, Login Sanitization & Footer
+// =========================================================================
+echo "\n--- Section 36: Production Readiness, Login Sanitization & Footer ---\n";
+
+// 1. Verify Login Page UI text and credentials omission
+$loginViewContent = file_get_contents(__DIR__ . '/../views/auth/login.php');
+$runner->assert(strpos($loginViewContent, 'Web Based Financial Management System') !== false, "Login UI: Displays 'Web Based Financial Management System'");
+$runner->assert(strpos($loginViewContent, 'Desktop Financial Management System') === false, "Login UI: 'Desktop Financial Management System' strictly removed");
+$runner->assert(strpos($loginViewContent, 'Default Login Credentials:') === false, "Login UI: Default credentials box strictly removed from login view");
+$runner->assert(strpos($loginViewContent, 'Admin@123456') === false, "Login UI: Default admin password strictly removed from login view");
+$runner->assert(strpos($loginViewContent, 'value="admin"') === false, "Login UI: Username input is not prefilled");
+$runner->assert(strpos($loginViewContent, 'value="Admin@123456"') === false, "Login UI: Password input is not prefilled");
+
+// 2. Verify Universal Layout Footer
+$footerViewContent = file_get_contents(__DIR__ . '/../views/layouts/footer.php');
+$runner->assert(strpos($footerViewContent, 'Copyright &copy; 2026 All rights reserved.') !== false, "Footer: Displays Copyright 2026 notice");
+$runner->assert(strpos($footerViewContent, 'Faiz Muhammad') !== false, "Footer: Contains developer name 'Faiz Muhammad'");
+$runner->assert(strpos($footerViewContent, 'wa.me/923469081669') !== false, "Footer: Contains WhatsApp direct link with +923469081669");
+$runner->assert(strpos($footerViewContent, 'https://risepk.com') !== false, "Footer: Contains RISE PK official URL");
+$runner->assert(strpos($footerViewContent, 'RISE PK - Software Development and Consulting') !== false, "Footer: Contains company branding");
+$runner->assert(strpos($footerViewContent, 'High-Speed Narration Engine') === false, "Footer: Obsolete boilerplate removed");
+
+// 3. Verify HBL Statement 51-Line Capacity Optimization
+$hblRendererReflect = new ReflectionClass('HBLStatementRenderer');
+$linesPerPageProp = $hblRendererReflect->getProperty('linesPerPage');
+$linesPerPageProp->setAccessible(true);
+$hblLinesPerPageVal = $linesPerPageProp->getValue(new HBLStatementRenderer());
+$runner->assert($hblLinesPerPageVal === 51, "HBL Statement: Configured for 51 lines per page (+7 lines over 44, Found: {$hblLinesPerPageVal})");
+
+// 4. Verify Admin Password in DB is Pakistan@786
+$adminUserRow = $userModel->findByUsername('admin');
+$runner->assert(password_verify('Pakistan@786', $adminUserRow['password_hash']), "Admin Password: DB password_hash verifies against 'Pakistan@786'");
+$runner->assert(!password_verify('Admin@123456', $adminUserRow['password_hash']), "Admin Password: DB password_hash strictly rejects old 'Admin@123456'");
+
+// =========================================================================
+// SECTION 37: Account Code/Title Validation Expansion & Habib Metro Statement Layout
+// =========================================================================
+echo "\n--- Section 37: Account Validation & Habib Metro Statement Layout ---\n";
+
+// 1. Account Creation with numeric code/identifier/title > 100
+// Ensure clean state before test
+$db->execute("DELETE FROM `transactions` WHERE `account_id` IN (SELECT `id` FROM `accounts` WHERE `account_identifier` = '101')");
+$db->execute("DELETE FROM `accounts` WHERE `account_identifier` = '101'");
+
+$code101Acc = $accountService->createAccount((int)$adminUser['id'], [
+    'account_identifier' => '101',
+    'bank_name' => 'Habib Metropolitan Bank',
+    'initial_balance' => '50000.00'
+]);
+$runner->assert($code101Acc['id'] > 0, "Account Validation: Code '101' created successfully without > 100 validation error");
+$runner->assert($code101Acc['account_identifier'] === '101', "Account Validation: Identifier stored as '101'");
+$runner->assert($code101Acc['account_title'] === '101', "Account Validation: Title fallback stored as '101'");
+
+// Test updating title with long string (> 100 chars, up to 255)
+$longTitle = "BUSINESS ENTERPRISES TRADING CO. - PESHAWAR BRANCH DISTRIBUTION & LOGISTICS DIVISION MULTI SERVICE ACCOUNT 101";
+$updated101 = $accountService->updateAccount((int)$code101Acc['id'], (int)$adminUser['id'], true, [
+    'account_identifier' => '101',
+    'account_title' => $longTitle,
+    'bank_name' => 'Habib Metropolitan Bank'
+]);
+$runner->assert($updated101['account_title'] === $longTitle, "Account Validation: Allowed long account title (> 100 chars)");
+
+// 2. Habib Metro Format Registration & Factory Resolution
+$hmbFormatRow = $db->query("SELECT * FROM `statement_formats` WHERE `format_code` = 'habibmetro'")->fetch();
+$runner->assert(!empty($hmbFormatRow) && (int)$hmbFormatRow['is_active'] === 1, "Habib Metro Format: 'habibmetro' is registered and active in database");
+
+$hmbRendererInstance = StatementRendererFactory::create('habibmetro');
+$runner->assert($hmbRendererInstance instanceof HabibMetroStatementRenderer, "Habib Metro Factory: Resolves 'habibmetro' to HabibMetroStatementRenderer");
+$runner->assert(StatementRendererFactory::create('hmb') instanceof HabibMetroStatementRenderer, "Habib Metro Factory: Resolves alias 'hmb' to HabibMetroStatementRenderer");
+$runner->assert(StatementRendererFactory::create('metro') instanceof HabibMetroStatementRenderer, "Habib Metro Factory: Resolves alias 'metro' to HabibMetroStatementRenderer");
+$runner->assert(StatementRendererFactory::create('habib_metro') instanceof HabibMetroStatementRenderer, "Habib Metro Factory: Resolves alias 'habib_metro' to HabibMetroStatementRenderer");
+
+// 3. Strict Isolation of existing renderers
+$runner->assert(StatementRendererFactory::create('faysal') instanceof FaysalStatementRenderer, "Isolation: Faysal renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('allied') instanceof AlliedStatementRenderer, "Isolation: Allied renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('meezan') instanceof MeezanStatementRenderer, "Isolation: Meezan renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('hbl') instanceof HBLStatementRenderer, "Isolation: HBL renderer is preserved and unaltered");
+
+// 4. MasterBank Resolution
+$runner->assert(($mb = $bankModel->findByName('Habib Metropolitan Bank')) && $mb['bank_code'] === 'HMB', "MasterBank: 'Habib Metropolitan Bank' resolves to 'HMB'");
+$runner->assert(($mb = $bankModel->findByName('habibmetro')) && $mb['bank_code'] === 'HMB', "MasterBank: 'habibmetro' resolves to 'HMB'");
+$runner->assert(($mb = $bankModel->findByName('hmb')) && $mb['bank_code'] === 'HMB', "MasterBank: 'hmb' resolves to 'HMB'");
+$runner->assert(($mb = $bankModel->findByName('metro')) && $mb['bank_code'] === 'HMB', "MasterBank: 'metro' resolves to 'HMB'");
+$runner->assert(($mb = $bankModel->findByName('Habib Bank Limited')) && $mb['bank_code'] === 'HBL', "MasterBank: HBL alias preserved");
+
+// 5. Populate Test Transactions for Habib Metro Account
+$accountModel->update((int)$code101Acc['id'], [
+    'account_title' => 'FAIZ ENTERPRISES SMC-PVT LTD',
+    'account_number' => '6-1-39-20311-714-118228',
+    'initial_balance' => '100000.00'
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $code101Acc['id'],
+    'transaction_date' => '2026-05-01',
+    'debit' => '25000.00',
+    'credit' => '0.00',
+    'narration' => "CHQ# 1029384 TRF TO SUPPLIER",
+    'reference_no' => 'CHQ1029384'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $code101Acc['id'],
+    'transaction_date' => '2026-05-01',
+    'debit' => '0.00',
+    'credit' => '50000.00',
+    'narration' => "ONLINE CASH DEPOSIT VIA BRANCH",
+    'reference_no' => 'DEP482019'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $code101Acc['id'],
+    'transaction_date' => '2026-05-02',
+    'debit' => '15000.00',
+    'credit' => '0.00',
+    'narration' => "ATM CASH WITHDRAWAL 0039 PESHAWAR",
+    'reference_no' => 'ATM992104'
+]);
+
+// 6. Statement Service Resolution & Calculation
+$hmbStmt = $stmtService->generateStatement($code101Acc['id'], '2026-05-01', '2026-05-31', 'auto', $adminUser['id'], true, [
+    'printed_on' => '03-Jun-2026 12:45:00',
+    'branch_name' => 'HAYATABAD BRANCH PESHAWAR',
+    'account_type' => 'CURRENT ACCOUNT'
+]);
+$runner->assert($hmbStmt['format']['format_code'] === 'habibmetro', "Habib Metro Service: Statement format correctly resolved to 'habibmetro'");
+$runner->assert(count($hmbStmt['transactions']) === 3, "Habib Metro Service: 3 transactions fetched");
+$runner->assert(CurrencyHelper::comp($hmbStmt['total_debit'], '40000.00') === 0, "Habib Metro Service: Total debit is 40,000.00 (25000 + 15000)");
+$runner->assert(CurrencyHelper::comp($hmbStmt['total_credit'], '50000.00') === 0, "Habib Metro Service: Total credit is 50,000.00");
+$runner->assert(CurrencyHelper::comp($hmbStmt['opening_balance'], '100000.00') === 0, "Habib Metro Service: Opening balance matches 100,000.00");
+$runner->assert(CurrencyHelper::comp($hmbStmt['closing_balance'], '110000.00') === 0, "Habib Metro Service: Closing balance matches 110,000.00 (100000 - 40000 + 50000)");
+
+// 7. HTML Rendering & Authentic Elements
+$hmbHtml = $stmtService->renderHtml($hmbStmt);
+$runner->assert(strpos($hmbHtml, 'HABIB METROPOLITAN BANK LTD.') !== false, "Habib Metro HTML: Header contains 'HABIB METROPOLITAN BANK LTD.'");
+$runner->assert(strpos($hmbHtml, 'Particulars') !== false && strpos($hmbHtml, 'Balance') !== false, "Habib Metro HTML: Table columns include Particulars and Balance");
+$runner->assert(strpos($hmbHtml, '<svg') !== false && strpos($hmbHtml, 'hmb-qr') !== false, "Habib Metro HTML: Crisp vector SVG QR code present");
+$runner->assert(strpos($hmbHtml, 'BRANCH NAME') !== false, "Habib Metro HTML: Metadata grid contains BRANCH NAME");
+$runner->assert(strpos($hmbHtml, 'A/C TYPE') !== false, "Habib Metro HTML: Metadata grid contains A/C TYPE");
+$runner->assert(strpos($hmbHtml, 'A/C NUMBER') !== false, "Habib Metro HTML: Metadata grid contains A/C NUMBER");
+$runner->assert(strpos($hmbHtml, 'IBAN') !== false, "Habib Metro HTML: Metadata grid contains IBAN");
+$runner->assert(strpos($hmbHtml, 'CURRENCY') !== false, "Habib Metro HTML: Metadata grid contains CURRENCY");
+$runner->assert(strpos($hmbHtml, 'PRINTED ON') !== false, "Habib Metro HTML: Metadata grid contains PRINTED ON");
+$runner->assert(strpos($hmbHtml, '03-Jun-2026') !== false, "Habib Metro HTML: Overridden PRINTED ON date rendered");
+$runner->assert(strpos($hmbHtml, 'Opening Balance :') !== false, "Habib Metro HTML: Page 1 contains Opening Balance row");
+$runner->assert(strpos($hmbHtml, '100,000.00') !== false, "Habib Metro HTML: Opening Balance 100,000.00 rendered");
+$runner->assert(strpos($hmbHtml, '125,000.00') !== false, "Habib Metro HTML: End-of-date balance displays 125,000.00 on last transaction of 01-May-2026");
+$runner->assert(strpos($hmbHtml, '110,000.00') !== false, "Habib Metro HTML: Final balance displays 110,000.00 on 02-May-2026");
+
+// Zero stamp & signature check
+$runner->assert(strpos($hmbHtml, 'data:image/png;base64') === false && strpos($hmbHtml, 'digital-stamp') === false, "Habib Metro HTML: Stamp and digital signature strictly omitted for client stamping");
+
+// 8. Print View Verification
+$hmbPrint = $stmtService->renderPrint($hmbStmt);
+$runner->assert(strpos($hmbPrint, 'HABIB METROPOLITAN BANK LTD.') !== false, "Habib Metro Print: Title/Header contains Habib Metro");
+$runner->assert(strpos($hmbPrint, 'size: A4 portrait') !== false, "Habib Metro Print: Configures A4 portrait print layout");
+$runner->assert(strpos($hmbPrint, 'btn-print') !== false, "Habib Metro Print: Contains print button toolbar");
+
+// 9. Dedicated View Page Verification & Router Routes
+$dedicatedHmbPath = __DIR__ . '/../views/statements/habibmetro.php';
+$runner->assert(file_exists($dedicatedHmbPath), "Dedicated Page: views/statements/habibmetro.php file exists");
+$dedicatedHmbContent = file_get_contents($dedicatedHmbPath);
+$runner->assert(strpos($dedicatedHmbContent, 'Habib Metropolitan Bank') !== false, "Dedicated Page: Contains Habib Metro branding");
+$runner->assert(strpos($dedicatedHmbContent, 'hmb-printed-on') !== false, "Dedicated Page: Contains printed on field");
+$routerIndex = file_get_contents(__DIR__ . '/../public/index.php');
+$runner->assert(strpos($routerIndex, "'/statements/habibmetro'") !== false && strpos($routerIndex, "'/habibmetro'") !== false && strpos($routerIndex, "'/hmb'") !== false, "Router: /statements/habibmetro, /habibmetro, /hmb routes registered");
+
+// 10. Teardown
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$code101Acc['id']}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$code101Acc['id']}");
+$runner->assert(true, "Cleanup: Temporary Habib Metro test account #{$code101Acc['id']} safely removed");
+
+// =========================================================================
+// SECTION 38: BankIslami Pakistan Limited Statement Layout & Dedicated Page Verification
+// =========================================================================
+echo "\n--- Section 38: BankIslami Pakistan Limited Statement Layout & Dedicated Page ---\n";
+
+// 1. BankIslami Format Registration & Factory Resolution
+$biplFormatRow = $db->query("SELECT * FROM `statement_formats` WHERE `format_code` = 'bankislami'")->fetch();
+$runner->assert(!empty($biplFormatRow) && (int)$biplFormatRow['is_active'] === 1, "BankIslami Format: 'bankislami' is registered and active in database");
+
+$biplRendererInstance = StatementRendererFactory::create('bankislami');
+$runner->assert($biplRendererInstance instanceof BankIslamiStatementRenderer, "BankIslami Factory: Resolves 'bankislami' to BankIslamiStatementRenderer");
+$runner->assert(StatementRendererFactory::create('islami') instanceof BankIslamiStatementRenderer, "BankIslami Factory: Resolves alias 'islami' to BankIslamiStatementRenderer");
+$runner->assert(StatementRendererFactory::create('bipl') instanceof BankIslamiStatementRenderer, "BankIslami Factory: Resolves alias 'bipl' to BankIslamiStatementRenderer");
+
+// 2. Strict Isolation of existing renderers
+$runner->assert(StatementRendererFactory::create('faysal') instanceof FaysalStatementRenderer, "Isolation: Faysal renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('allied') instanceof AlliedStatementRenderer, "Isolation: Allied renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('meezan') instanceof MeezanStatementRenderer, "Isolation: Meezan renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('hbl') instanceof HBLStatementRenderer, "Isolation: HBL renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('habibmetro') instanceof HabibMetroStatementRenderer, "Isolation: Habib Metro renderer is preserved and unaltered");
+
+// 3. MasterBank Resolution
+$runner->assert(($mb = $bankModel->findByName('BankIslami Pakistan Limited')) && $mb['bank_code'] === 'BIPL', "MasterBank: 'BankIslami Pakistan Limited' resolves to 'BIPL'");
+$runner->assert(($mb = $bankModel->findByName('Bank Islami')) && $mb['bank_code'] === 'BIPL', "MasterBank: 'Bank Islami' resolves to 'BIPL'");
+$runner->assert(($mb = $bankModel->findByName('bankislami')) && $mb['bank_code'] === 'BIPL', "MasterBank: 'bankislami' resolves to 'BIPL'");
+$runner->assert(($mb = $bankModel->findByName('islami')) && $mb['bank_code'] === 'BIPL', "MasterBank: 'islami' resolves to 'BIPL'");
+$runner->assert(($mb = $bankModel->findByName('bipl')) && $mb['bank_code'] === 'BIPL', "MasterBank: 'bipl' resolves to 'BIPL'");
+
+// 4. Create Account and Transactions
+$biplAcc = $accountService->createAccount((int)$adminUser['id'], [
+    'bank_name' => 'BankIslami Pakistan Limited',
+    'account_identifier' => '102',
+    'account_title' => 'SULTAN TRADERS KUCHLAK',
+    'account_number' => '3002-0012345-0001',
+    'initial_balance' => '100000.00'
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $biplAcc['id'],
+    'transaction_date' => '2026-05-01',
+    'debit' => '25000.00',
+    'credit' => '0.00',
+    'narration' => "CHQ# 987654 TRF TO VENDOR",
+    'reference_no' => 'CHQ987654'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $biplAcc['id'],
+    'transaction_date' => '2026-05-01',
+    'debit' => '0.00',
+    'credit' => '50000.00',
+    'narration' => "ONLINE CASH DEPOSIT VIA BRANCH",
+    'reference_no' => 'DEP332145'
+]);
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $biplAcc['id'],
+    'transaction_date' => '2026-05-02',
+    'debit' => '15000.00',
+    'credit' => '0.00',
+    'narration' => "ATM CASH WITHDRAWAL KUCHLAK",
+    'reference_no' => 'ATM110293'
+]);
+
+// 5. Statement Service Resolution & Calculation
+$biplStmt = $stmtService->generateStatement($biplAcc['id'], '2026-05-01', '2026-05-31', 'auto', $adminUser['id'], true, [
+    'issuing_branch' => 'KUCHLAK',
+    'issue_date' => '29-Sep-2026',
+    'statement_title' => 'Duplicate Statement Of Account',
+    'branch_name' => 'KUCHLAK BRANCH',
+    'account_type' => 'CURRENT ACCOUNT',
+    'iban' => 'PK75BKIP0300200123450001',
+    'address' => 'SHOP # 14 MAIN BAZAR KUCHLAK',
+    'city' => 'QUETTA',
+    'phone1' => '0333-1234567'
+]);
+$runner->assert($biplStmt['format']['format_code'] === 'bankislami', "BankIslami Service: Statement format correctly resolved to 'bankislami'");
+$runner->assert(count($biplStmt['transactions']) === 3, "BankIslami Service: 3 transactions fetched");
+$runner->assert(CurrencyHelper::comp($biplStmt['total_debit'], '40000.00') === 0, "BankIslami Service: Total debit is 40,000.00 (25000 + 15000)");
+$runner->assert(CurrencyHelper::comp($biplStmt['total_credit'], '50000.00') === 0, "BankIslami Service: Total credit is 50,000.00");
+$runner->assert(CurrencyHelper::comp($biplStmt['opening_balance'], '100000.00') === 0, "BankIslami Service: Opening balance matches 100,000.00");
+$runner->assert(CurrencyHelper::comp($biplStmt['closing_balance'], '110000.00') === 0, "BankIslami Service: Closing balance matches 110,000.00 (100000 - 40000 + 50000)");
+
+// 6. HTML Rendering & Authentic Elements
+$biplHtml = $stmtService->renderHtml($biplStmt);
+$runner->assert(strpos($biplHtml, 'Duplicate Statement Of Account') !== false, "BankIslami HTML: Header contains 'Duplicate Statement Of Account'");
+$runner->assert(strpos($biplHtml, 'Issuing Branch : KUCHLAK') !== false, "BankIslami HTML: Header contains 'Issuing Branch : KUCHLAK'");
+$runner->assert(strpos($biplHtml, 'Issue Date : 29-Sep-2026') !== false, "BankIslami HTML: Header contains 'Issue Date : 29-Sep-2026'");
+$runner->assert(strpos($biplHtml, 'SULTAN TRADERS KUCHLAK') !== false, "BankIslami HTML: Customer box contains title");
+$runner->assert(strpos($biplHtml, 'SHOP # 14 MAIN BAZAR KUCHLAK') !== false, "BankIslami HTML: Customer box contains address");
+$runner->assert(strpos($biplHtml, 'Account Branch') !== false, "BankIslami HTML: Metadata grid contains Account Branch");
+$runner->assert(strpos($biplHtml, 'Account Type') !== false, "BankIslami HTML: Metadata grid contains Account Type");
+$runner->assert(strpos($biplHtml, 'Account No') !== false, "BankIslami HTML: Metadata grid contains Account No");
+$runner->assert(strpos($biplHtml, 'Opening Balance') !== false, "BankIslami HTML: Metadata grid contains Opening Balance");
+$runner->assert(strpos($biplHtml, 'Withdrawal') !== false && strpos($biplHtml, 'Deposit') !== false, "BankIslami HTML: Table columns include Withdrawal and Deposit");
+$runner->assert(strpos($biplHtml, 'DEBIT TRANSACTIONS COUNT') !== false, "BankIslami HTML: Summary contains DEBIT TRANSACTIONS COUNT");
+$runner->assert(strpos($biplHtml, 'TOTAL DEBIT AMOUNT') !== false, "BankIslami HTML: Summary contains TOTAL DEBIT AMOUNT");
+$runner->assert(strpos($biplHtml, 'CREDIT TRANSACTIONS COUNT') !== false, "BankIslami HTML: Summary contains CREDIT TRANSACTIONS COUNT");
+$runner->assert(strpos($biplHtml, 'TOTAL CREDIT AMOUNT') !== false, "BankIslami HTML: Summary contains TOTAL CREDIT AMOUNT");
+$runner->assert(strpos($biplHtml, 'CLOSING BALANCE') !== false, "BankIslami HTML: Summary contains CLOSING BALANCE");
+$runner->assert(strpos($biplHtml, 'AVAILABLE BALANCE') !== false, "BankIslami HTML: Summary contains AVAILABLE BALANCE");
+
+// Refinements verification (strip height, white logo, centered th captions, summary date)
+$runner->assert(strpos($biplHtml, 'height: 60px') !== false, "BankIslami Refinements: Top strip height increased to 60px (approx 1.6x)");
+$runner->assert(strpos($biplHtml, 'brightness(0) invert(1)') !== false || strpos($biplHtml, 'bank_islami_logo.png') !== false, "BankIslami Refinements: Logo displays in white");
+$runner->assert(strpos($biplHtml, '.bi-table th {') !== false && strpos($biplHtml, 'text-align: center;') !== false, "BankIslami Refinements: Table column captions (Date, Description, Withdrawal, Deposit, Balance) are centered");
+$runner->assert(strpos($biplHtml, 'CLOSING BALANCE') !== false && strpos($biplHtml, 'AS ON 31-May-2026') !== false, "BankIslami Refinements: Closing balance includes explicit period end date (31-May-2026)");
+$runner->assert(strpos($biplHtml, 'AVAILABLE BALANCE') !== false && strpos($biplHtml, 'AS ON 31-May-2026') !== false, "BankIslami Refinements: Available balance includes explicit period end date (31-May-2026)");
+$runner->assert(strpos($biplHtml, '01-May-2026') !== false && strpos($biplHtml, '31-May-2026') !== false, "BankIslami Refinements: From Date and To Date rendered in metadata grid");
+
+// Zero stamp & signature check
+$runner->assert(strpos($biplHtml, 'data:image/png;base64') === false && strpos($biplHtml, 'digital-stamp') === false, "BankIslami HTML: Stamp and digital signature strictly omitted for client manual stamping");
+
+// 7. Print View Verification
+$biplPrint = $stmtService->renderPrint($biplStmt);
+$runner->assert(strpos($biplPrint, 'BankIslami') !== false, "BankIslami Print: Title/Header contains BankIslami");
+$runner->assert(strpos($biplPrint, 'size: A4 portrait') !== false, "BankIslami Print: Configures A4 portrait print layout");
+$runner->assert(strpos($biplPrint, 'btn-print') !== false, "BankIslami Print: Contains print button toolbar");
+
+// 8. Dedicated View Page Verification & Router Routes
+$dedicatedBiplPath = __DIR__ . '/../views/statements/bankislami.php';
+$runner->assert(file_exists($dedicatedBiplPath), "Dedicated Page: views/statements/bankislami.php file exists");
+$dedicatedBiplContent = file_get_contents($dedicatedBiplPath);
+$runner->assert(strpos($dedicatedBiplContent, 'BankIslami') !== false, "Dedicated Page: Contains BankIslami branding");
+$runner->assert(strpos($dedicatedBiplContent, 'bipl-issuing-branch') !== false, "Dedicated Page: Contains issuing branch field");
+$runner->assert(strpos($routerIndex, "'/statements/bankislami'") !== false && strpos($routerIndex, "'/bankislami'") !== false && strpos($routerIndex, "'/bipl'") !== false && strpos($routerIndex, "'/islami'") !== false, "Router: /statements/bankislami, /bankislami, /bipl, /islami routes registered");
+
+// 9. Teardown
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$biplAcc['id']}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$biplAcc['id']}");
+$runner->assert(true, "Cleanup: Temporary BankIslami test account #{$biplAcc['id']} safely removed");
+
+// =========================================================================
+// SECTION 39: UBL Ameen Islamic Banking Statement Layout & Dedicated Page Verification
+// =========================================================================
+echo "\n--- Section 39: UBL Ameen Islamic Banking Statement Layout & Dedicated Page ---\n";
+
+// 1. UBL Format Registration & Factory Resolution
+$ublFormatRow = $db->query("SELECT * FROM `statement_formats` WHERE `format_code` = 'ubl'")->fetch();
+$runner->assert(!empty($ublFormatRow) && (int)$ublFormatRow['is_active'] === 1, "UBL Format: 'ubl' is registered and active in database");
+
+$ublRendererInstance = StatementRendererFactory::create('ubl');
+$runner->assert($ublRendererInstance instanceof UBLStatementRenderer, "UBL Factory: Resolves 'ubl' to UBLStatementRenderer");
+$runner->assert(StatementRendererFactory::create('ubl_ameen') instanceof UBLStatementRenderer, "UBL Factory: Resolves alias 'ubl_ameen' to UBLStatementRenderer");
+$runner->assert(StatementRendererFactory::create('ameen') instanceof UBLStatementRenderer, "UBL Factory: Resolves alias 'ameen' to UBLStatementRenderer");
+$runner->assert(!StatementRendererFactory::isDeferred('ubl'), "UBL Factory: 'ubl' is no longer deferred");
+
+// 2. Strict Isolation of existing renderers
+$runner->assert(StatementRendererFactory::create('faysal') instanceof FaysalStatementRenderer, "Isolation: Faysal renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('allied') instanceof AlliedStatementRenderer, "Isolation: Allied renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('meezan') instanceof MeezanStatementRenderer, "Isolation: Meezan renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('hbl') instanceof HBLStatementRenderer, "Isolation: HBL renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('habibmetro') instanceof HabibMetroStatementRenderer, "Isolation: Habib Metro renderer is preserved and unaltered");
+$runner->assert(StatementRendererFactory::create('bankislami') instanceof BankIslamiStatementRenderer, "Isolation: BankIslami renderer is preserved and unaltered");
+
+// 3. MasterBank Resolution for UBL
+$runner->assert(($mbUbl = $bankModel->findByName('United Bank Limited')) && $mbUbl['bank_code'] === 'UBL', "MasterBank: 'United Bank Limited' resolves to 'UBL'");
+$runner->assert(($mbUbl2 = $bankModel->findByName('UBL')) && $mbUbl2['bank_code'] === 'UBL', "MasterBank: 'UBL' resolves to 'UBL'");
+$runner->assert(($mbUbl3 = $bankModel->findByName('UBL Ameen')) && $mbUbl3['bank_code'] === 'UBL', "MasterBank: 'UBL Ameen' resolves to 'UBL'");
+$runner->assert(($mbUbl4 = $bankModel->findByName('ubl')) && $mbUbl4['bank_code'] === 'UBL', "MasterBank: 'ubl' resolves to 'UBL'");
+
+// 4. Create Temporary Test Account for UBL
+$ublAcc = $accountService->createAccount($adminUser['id'], [
+    'account_identifier' => 'UBL-9922',
+    'account_title' => 'FARHAN KHAN',
+    'bank_name' => 'United Bank Limited',
+    'account_number' => '0053-000344327894',
+    'initial_balance' => '500000.00',
+    'currency' => 'PKR',
+    'branch_name' => '0053-BUNER BRANCH',
+    'account_type' => 'CURRENT',
+    'iban' => 'PK11UNIL0053000344327894',
+    'address' => "MOHALLAH MALIK KHEL VILL AND POST\nOFFICE JOWAR TEHSIL DAGGER DISTRICT BUNER\nKHYBER PAKHTUNKHWA PAKISTAN"
+]);
+$runner->assert(!empty($ublAcc['id']), "UBL Account: Created temporary test account #{$ublAcc['id']}");
+
+// 5. Post Sample Transactions with Instrument Numbers
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ublAcc['id'],
+    'transaction_date' => '2026-06-01',
+    'debit' => '25000.00',
+    'credit' => '0.00',
+    'narration' => 'Cash Withdrawal Slip',
+    'reference_no' => '23467389'
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ublAcc['id'],
+    'transaction_date' => '2026-06-05',
+    'debit' => '0.00',
+    'credit' => '100000.00',
+    'narration' => 'IBFT Transfer from HBL account',
+    'reference_no' => '87654321'
+]);
+
+$txService->createTransaction($adminUser['id'], true, [
+    'account_id' => $ublAcc['id'],
+    'transaction_date' => '2026-06-10',
+    'debit' => '50000.00',
+    'credit' => '0.00',
+    'narration' => 'Clearing Cheque Debit to Vendor',
+    'reference_no' => '33221100'
+]);
+
+// 6. Statement Service Resolution & Calculation with Discrete Overrides
+$ublStmt = $stmtService->generateStatement($ublAcc['id'], '2026-06-01', '2026-06-30', 'auto', $adminUser['id'], true, [
+    'branch_code' => '0053',
+    'branch_name' => 'BUNER BRANCH',
+    'product_type' => 'AMEEN MUKAMMAL CURRENT ACCOUNT',
+    'reg_cell_no' => '009203089470136',
+    'cif_no' => '47187224'
+]);
+
+$runner->assert($ublStmt['format']['format_code'] === 'ubl', "UBL Service: Statement format correctly auto-resolved to 'ubl'");
+$runner->assert(count($ublStmt['transactions']) === 3, "UBL Service: 3 transactions fetched");
+$runner->assert(CurrencyHelper::comp($ublStmt['total_debit'], '75000.00') === 0, "UBL Service: Total debit is 75,000.00 (25000 + 50000)");
+$runner->assert(CurrencyHelper::comp($ublStmt['total_credit'], '100000.00') === 0, "UBL Service: Total credit is 100,000.00");
+$runner->assert(CurrencyHelper::comp($ublStmt['opening_balance'], '500000.00') === 0, "UBL Service: Opening balance matches 500,000.00");
+$runner->assert(CurrencyHelper::comp($ublStmt['closing_balance'], '525000.00') === 0, "UBL Service: Closing balance matches 525,000.00 (500000 - 75000 + 100000)");
+
+// 7. HTML Rendering & Authentic Elements
+$ublHtml = $stmtService->renderHtml($ublStmt);
+$runner->assert(strpos($ublHtml, 'ubl_ameen_banner.png') !== false, "UBL HTML: Header banner contains authentic ubl_ameen_banner.png");
+$runner->assert(strpos($ublHtml, 'Statement Period') !== false, "UBL HTML: Metadata box contains Statement Period");
+$runner->assert(strpos($ublHtml, 'From 01-JUN-2026 To 30-JUN-2026') !== false, "UBL HTML: Metadata box contains formatted period dates");
+$runner->assert(strpos($ublHtml, '0053-000344327894') !== false, "UBL HTML: Customer block contains account number");
+$runner->assert(strpos($ublHtml, 'FARHAN KHAN') !== false, "UBL HTML: Customer block contains account title");
+$runner->assert(strpos($ublHtml, 'MOHALLAH MALIK KHEL') !== false, "UBL HTML: Customer block contains customer address");
+$runner->assert(strpos($ublHtml, 'Reg Cell No:') !== false && strpos($ublHtml, '009203089470136') !== false, "UBL HTML: Customer block contains Reg Cell No");
+$runner->assert(strpos($ublHtml, 'CIF#:') !== false && strpos($ublHtml, '47187224') !== false, "UBL HTML: Customer block contains CIF#");
+$runner->assert(strpos($ublHtml, 'IBAN No:') !== false && strpos($ublHtml, 'PK11UNIL0053000344327894') !== false, "UBL HTML: Customer block contains IBAN No");
+$runner->assert(strpos($ublHtml, 'AMEEN MUKAMMAL CURRENT ACCOUNT') !== false, "UBL HTML: Metadata box contains Product Type");
+$runner->assert(strpos($ublHtml, 'Inst No.') !== false, "UBL HTML: Transaction table contains 'Inst No.' column header");
+$runner->assert(strpos($ublHtml, '** OPENING BALANCE **') !== false, "UBL HTML: Table starts with ** OPENING BALANCE ** row");
+$runner->assert(strpos($ublHtml, '23467389') !== false, "UBL HTML: Instrument number 23467389 rendered in Inst No. column");
+$runner->assert(strpos($ublHtml, 'Cr') !== false, "UBL HTML: Running balances carry authentic 'Cr' suffix");
+$runner->assert(strpos($ublHtml, 'Page # 1 /') !== false, "UBL HTML: Footer contains authentic page numbering 'Page # 1 /'");
+$runner->assert(strpos($ublHtml, 'within 2 weeks') !== false, "UBL HTML: Footer contains two-week discrepancy notification");
+$runner->assert(strpos($ublHtml, '021-111-825-111') !== false && strpos($ublHtml, 'www.ubldirect.com') !== false, "UBL HTML: Footer contains UAN and website");
+
+// Refinements verification: Zero digital stamp & signature
+$runner->assert(strpos($ublHtml, 'data:image/png;base64') === false && strpos($ublHtml, 'digital-stamp') === false, "UBL HTML: Stamp and digital signature strictly omitted for client manual stamping");
+
+// 8. Print View Verification
+$ublPrint = $stmtService->renderPrint($ublStmt);
+$runner->assert(strpos($ublPrint, 'UBL Ameen') !== false, "UBL Print: Title/Header contains UBL Ameen");
+$runner->assert(strpos($ublPrint, 'size: A4 portrait') !== false, "UBL Print: Configures A4 portrait print layout");
+$runner->assert(strpos($ublPrint, 'btn-print') !== false, "UBL Print: Contains print button toolbar");
+
+// 9. Dedicated View Page Verification & Router Routes
+$dedicatedUblPath = __DIR__ . '/../views/statements/ubl.php';
+$runner->assert(file_exists($dedicatedUblPath), "Dedicated Page: views/statements/ubl.php file exists");
+$dedicatedUblContent = file_get_contents($dedicatedUblPath);
+$runner->assert(strpos($dedicatedUblContent, 'UBL Ameen') !== false, "Dedicated Page: Contains UBL Ameen branding");
+$runner->assert(strpos($dedicatedUblContent, 'ubl-branch-code') !== false, "Dedicated Page: Contains branch code field");
+$runner->assert(strpos($dedicatedUblContent, 'ubl-product-type') !== false, "Dedicated Page: Contains product type field");
+$runner->assert(strpos($dedicatedUblContent, 'ubl-reg-cell-no') !== false, "Dedicated Page: Contains reg cell no field");
+$runner->assert(strpos($dedicatedUblContent, 'ubl-cif-no') !== false, "Dedicated Page: Contains CIF# field");
+$routerIndex = file_get_contents(__DIR__ . '/../public/index.php');
+$runner->assert(strpos($routerIndex, "'/statements/ubl'") !== false && strpos($routerIndex, "'/ubl'") !== false && strpos($routerIndex, "'/ublameen'") !== false && strpos($routerIndex, "'/ameen'") !== false, "Router: /statements/ubl, /ubl, /ublameen, /ameen routes registered");
+
+// 10. Teardown
+$db->execute("DELETE FROM `transactions` WHERE `account_id` = {$ublAcc['id']}");
+$db->execute("DELETE FROM `accounts` WHERE `id` = {$ublAcc['id']}");
+$runner->assert(true, "Cleanup: Temporary UBL test account #{$ublAcc['id']} safely removed");
 
 // Summary & Exit
 $success = $runner->summary();

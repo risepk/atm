@@ -4,6 +4,8 @@
 require_once __DIR__ . '/BaseController.php';
 require_once __DIR__ . '/../Models/NarrationTemplate.php';
 require_once __DIR__ . '/../Models/TemplateField.php';
+require_once __DIR__ . '/../Models/MasterBank.php';
+require_once __DIR__ . '/../Models/CustomFieldType.php';
 require_once __DIR__ . '/../Services/NarrationService.php';
 require_once __DIR__ . '/../Services/AuditService.php';
 require_once __DIR__ . '/../Helpers/SecurityHelper.php';
@@ -11,6 +13,8 @@ require_once __DIR__ . '/../Helpers/SecurityHelper.php';
 class TemplateController extends BaseController {
     private NarrationTemplate $templateModel;
     private TemplateField $fieldModel;
+    private MasterBank $bankModel;
+    private CustomFieldType $customTypeModel;
     private NarrationService $narrationService;
     private AuditService $auditService;
 
@@ -18,6 +22,8 @@ class TemplateController extends BaseController {
         parent::__construct();
         $this->templateModel = new NarrationTemplate();
         $this->fieldModel = new TemplateField();
+        $this->bankModel = new MasterBank();
+        $this->customTypeModel = new CustomFieldType();
         $this->narrationService = new NarrationService();
         $this->auditService = new AuditService();
     }
@@ -28,7 +34,12 @@ class TemplateController extends BaseController {
     }
 
     public function create(Request $request): void {
-        $this->render('templates/create');
+        $banks = $this->bankModel->getActiveBanks();
+        $customTypes = $this->customTypeModel->getActiveTypes();
+        $this->render('templates/create', [
+            'banks' => $banks,
+            'customTypes' => $customTypes
+        ]);
     }
 
     public function edit(Request $request, array $params): void {
@@ -37,11 +48,19 @@ class TemplateController extends BaseController {
         if (!$tpl) {
             Response::redirect('/templates');
         }
-        $this->render('templates/edit', ['template' => $tpl]);
+        $banks = $this->bankModel->getActiveBanks();
+        $customTypes = $this->customTypeModel->getActiveTypes();
+        $this->render('templates/edit', [
+            'template' => $tpl, 
+            'banks' => $banks,
+            'customTypes' => $customTypes
+        ]);
     }
 
     public function apiActive(Request $request): void {
-        $templates = $this->narrationService->getActiveTemplatesWithFields();
+        $bankId = $request->get('bank_id');
+        $bankId = ($bankId !== null && $bankId !== '') ? (int)$bankId : null;
+        $templates = $this->narrationService->getActiveTemplatesWithFields($bankId);
         $this->jsonSuccess($templates);
     }
 
@@ -53,6 +72,7 @@ class TemplateController extends BaseController {
         $code = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', $data['code'] ?? ''));
         $pattern = trim((string)($data['pattern'] ?? ''));
         $category = SecurityHelper::clean($data['category'] ?? 'general');
+        $bankId = (!empty($data['bank_id']) && (int)$data['bank_id'] > 0) ? (int)$data['bank_id'] : null;
         $description = SecurityHelper::clean($data['description'] ?? '');
         $fields = $data['fields'] ?? [];
 
@@ -84,6 +104,7 @@ class TemplateController extends BaseController {
                     'name' => $name,
                     'code' => $code,
                     'category' => $category,
+                    'bank_id' => $bankId,
                     'pattern' => $pattern,
                     'description' => $description,
                     'version' => $newVersion,
@@ -101,6 +122,7 @@ class TemplateController extends BaseController {
                     'name' => $name,
                     'code' => $code,
                     'category' => $category,
+                    'bank_id' => $bankId,
                     'pattern' => $pattern,
                     'description' => $description,
                     'version' => 1,
@@ -121,7 +143,15 @@ class TemplateController extends BaseController {
                 $generatorRule = null;
                 if (!empty($f['generator_rule'])) {
                     $generatorRule = is_array($f['generator_rule']) ? json_encode($f['generator_rule']) : $f['generator_rule'];
+                } elseif (!empty($f['options_source'])) {
+                    $opt = trim((string)$f['options_source']);
+                    // If options_source contains pattern tokens or type is custom_pattern, save as generator_rule
+                    if (strpos($opt, '#') !== -1 || strpos($opt, '@') !== -1 || strpos($opt, '[') !== -1 || ($f['field_type'] ?? '') === 'custom_pattern') {
+                        $generatorRule = json_encode(['pattern' => $opt, 'type' => $f['field_type'] ?? 'custom']);
+                    }
                 }
+
+                $isRegen = (!empty($f['is_regeneratable']) || !empty($f['regenerate'])) ? 1 : 0;
 
                 $fieldData = [
                     'template_id' => $templateId,
@@ -131,6 +161,7 @@ class TemplateController extends BaseController {
                     'placeholder' => SecurityHelper::clean($f['placeholder'] ?? ''),
                     'default_value' => SecurityHelper::clean($f['default_value'] ?? ''),
                     'is_required' => !empty($f['is_required']) ? 1 : 0,
+                    'is_regeneratable' => $isRegen,
                     'generator_rule' => $generatorRule,
                     'options_source' => SecurityHelper::clean($f['options_source'] ?? ''),
                     'sort_order' => $sort++
@@ -145,5 +176,51 @@ class TemplateController extends BaseController {
             $db->rollBack();
             $this->jsonError($e->getMessage(), null, 400);
         }
+    }
+
+    public function apiCustomTypesList(Request $request): void {
+        $types = $this->customTypeModel->getActiveTypes();
+        $this->jsonSuccess($types);
+    }
+
+    public function apiCustomTypesSave(Request $request): void {
+        $data = $request->all();
+        $name = SecurityHelper::clean($data['type_name'] ?? '');
+        $code = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $data['type_code'] ?? ''));
+        $pattern = trim((string)($data['pattern'] ?? ''));
+        $description = SecurityHelper::clean($data['description'] ?? '');
+
+        if (!$name || !$code || !$pattern) {
+            $this->jsonError('Type Name, unique Code, and Pattern are required.', null, 422);
+        }
+
+        $id = !empty($data['id']) ? (int)$data['id'] : 0;
+        
+        $existing = $this->customTypeModel->findByCode($code);
+        if ($existing && ($id <= 0 || (int)$existing['id'] !== $id)) {
+            $this->jsonError("Type code '{$code}' already exists. Please choose a unique code.", null, 422);
+        }
+
+        $savedId = $this->customTypeModel->saveType([
+            'id' => $id,
+            'type_code' => $code,
+            'type_name' => $name,
+            'pattern' => $pattern,
+            'description' => $description,
+            'is_regeneratable' => 1,
+            'is_active' => 1
+        ]);
+
+        $saved = $this->customTypeModel->find($savedId);
+        $this->jsonSuccess($saved, 'Custom banking type saved successfully.');
+    }
+
+    public function apiCustomTypesDelete(Request $request, array $params): void {
+        $id = (int)($params['id'] ?? 0);
+        if ($id <= 0) {
+            $this->jsonError('Invalid custom type ID.');
+        }
+        $this->customTypeModel->update($id, ['is_active' => 0, 'updated_at' => date('Y-m-d H:i:s')]);
+        $this->jsonSuccess(null, 'Custom type removed.');
     }
 }

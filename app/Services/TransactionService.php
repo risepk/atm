@@ -64,11 +64,16 @@ class TransactionService {
             throw new Exception("Narration / Description is required.");
         }
 
-        // 5. Date Validation
+        // 5. Date Validation (supports back dates and future dates, normalizes format)
         $txDate = trim((string)($data['transaction_date'] ?? date('Y-m-d')));
         $d = DateTime::createFromFormat('Y-m-d', $txDate);
         if (!$d || $d->format('Y-m-d') !== $txDate) {
-            throw new Exception("Invalid transaction date format. Expected YYYY-MM-DD.");
+            $parsedTs = strtotime(str_replace('/', '-', $txDate));
+            if ($parsedTs !== false) {
+                $txDate = date('Y-m-d', $parsedTs);
+            } else {
+                throw new Exception("Invalid transaction date format. Expected YYYY-MM-DD.");
+            }
         }
 
         // 6. Server-Side Template & Payload Validation
@@ -178,7 +183,12 @@ class TransactionService {
         $txDate = trim((string)($data['transaction_date'] ?? $existing['transaction_date']));
         $d = DateTime::createFromFormat('Y-m-d', $txDate);
         if (!$d || $d->format('Y-m-d') !== $txDate) {
-            throw new Exception("Invalid transaction date format. Expected YYYY-MM-DD.");
+            $parsedTs = strtotime(str_replace('/', '-', $txDate));
+            if ($parsedTs !== false) {
+                $txDate = date('Y-m-d', $parsedTs);
+            } else {
+                throw new Exception("Invalid transaction date format. Expected YYYY-MM-DD.");
+            }
         }
 
         $templateId = !empty($data['template_id']) ? (int)$data['template_id'] : null;
@@ -290,16 +300,17 @@ class TransactionService {
         return $this->txModel->getFilteredTransactions($filters, $page, $limit);
     }
 
-    public function getRecentAccountTransactions(int $accountId, int $userId, bool $isAdmin, int $limit = 20): array {
+    public function getRecentAccountTransactions(int $accountId, int $userId, bool $isAdmin, int $limit = 0): array {
         $account = $this->accountService->getAccount($accountId, $userId, $isAdmin);
 
+        $limitSql = ($limit > 0) ? "LIMIT {$limit}" : "";
         $sql = "SELECT t.*, u.username, u.full_name AS user_name
                 FROM `transactions` t
                 INNER JOIN `users` u ON u.id = t.user_id
                 WHERE t.account_id = ? 
                   AND t.deleted_at IS NULL 
                 ORDER BY t.transaction_date DESC, t.id DESC
-                LIMIT {$limit}";
+                {$limitSql}";
         $rows = $this->db->fetchAll($sql, [$accountId]);
 
         $formatted = [];

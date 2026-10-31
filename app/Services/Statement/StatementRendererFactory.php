@@ -6,29 +6,51 @@ require_once __DIR__ . '/StandardStatementRenderer.php';
 require_once __DIR__ . '/HBLStatementRenderer.php';
 require_once __DIR__ . '/OnlineStatementRenderer.php';
 require_once __DIR__ . '/FaysalStatementRenderer.php';
+require_once __DIR__ . '/AlliedStatementRenderer.php';
+require_once __DIR__ . '/MeezanStatementRenderer.php';
+require_once __DIR__ . '/HabibMetroStatementRenderer.php';
+require_once __DIR__ . '/BankIslamiStatementRenderer.php';
+require_once __DIR__ . '/UBLStatementRenderer.php';
 
 class StatementRendererFactory {
     /**
      * Map of format codes to renderer classes.
      * HBL layout is fully implemented based on authentic client sample.
      * Faysal Bank layout is fully implemented based on authentic client photo.
+     * Allied Bank layout is fully implemented based on authentic client scan.
+     * Meezan Bank layout is fully implemented based on authentic client statement.
+     * Habib Metropolitan Bank layout is fully implemented based on authentic client statement.
+     * BankIslami Pakistan layout is fully implemented based on authentic client statement.
+     * UBL Ameen Islamic Banking layout is fully implemented based on authentic client statement.
      * Online layout is fully implemented for digital e-statements.
-     * Meezan, UBL, and MCB remain deferred awaiting sample layouts.
+     * MCB remains deferred awaiting sample layout.
      */
     private static array $renderers = [
         'standard' => StandardStatementRenderer::class,
         'hbl' => HBLStatementRenderer::class,
         'online' => OnlineStatementRenderer::class,
         'faysal' => FaysalStatementRenderer::class,
-        'faisal' => FaysalStatementRenderer::class
+        'faisal' => FaysalStatementRenderer::class,
+        'allied' => AlliedStatementRenderer::class,
+        'abl' => AlliedStatementRenderer::class,
+        'meezan' => MeezanStatementRenderer::class,
+        'mezn' => MeezanStatementRenderer::class,
+        'habibmetro' => HabibMetroStatementRenderer::class,
+        'hmb' => HabibMetroStatementRenderer::class,
+        'metro' => HabibMetroStatementRenderer::class,
+        'habib_metro' => HabibMetroStatementRenderer::class,
+        'bankislami' => BankIslamiStatementRenderer::class,
+        'islami' => BankIslamiStatementRenderer::class,
+        'bipl' => BankIslamiStatementRenderer::class,
+        'ubl' => UBLStatementRenderer::class,
+        'ubl_ameen' => UBLStatementRenderer::class,
+        'ameen' => UBLStatementRenderer::class
     ];
 
     /**
      * List of deferred formats pending client specifications.
      */
     private static array $deferredFormats = [
-        'meezan' => 'Meezan Bank Layout (Deferred — awaiting client sample layout)',
-        'ubl' => 'United Bank Limited Layout (Deferred — awaiting client sample layout)',
         'mcb' => 'MCB Bank Layout (Deferred — awaiting client sample layout)'
     ];
 

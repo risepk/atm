@@ -71,6 +71,11 @@ class FaysalStatementRenderer implements StatementRendererInterface {
             vertical-align: top;
         }
 
+        .statement-date-text {
+            white-space: nowrap !important;
+            font-size: 11px;
+        }
+
         .page-num-wrap {
             margin-top: 6px;
             padding-right: 24px; /* Right edge se 4-5 characters ka space */
@@ -221,21 +226,21 @@ CSS;
             <!-- Header Table -->
             <table class="header-table">
                 <tr>
-                    <td style="width: 22%;">
+                    <td style="width: 20%;">
                         <?php if (!empty($account['bank_logo'])): ?>
                             <img src="/atm/public/<?= htmlspecialchars($account['bank_logo'], ENT_QUOTES, 'UTF-8') ?>" alt="Faysal Bank" style="height: 38px; object-fit: contain;">
                         <?php else: ?>
                             <?= $this->getDefaultLogoSvg() ?>
                         <?php endif; ?>
                     </td>
-                    <td style="width: 53%; padding-left: 12px; padding-top: 1px;">
+                    <td style="width: 48%; padding-left: 10px; padding-top: 1px;">
                         <div style="font-size: 19px; font-weight: bold; letter-spacing: -0.2px;">Account Statement</div>
-                        <div style="font-size: 11.5px; font-weight: bold; margin-top: 7px;">
+                        <div style="font-size: 11.5px; font-weight: bold; margin-top: 7px; white-space: nowrap;">
                             Statement Period From:&nbsp;&nbsp;<span style="text-decoration: underline;"><?= $startDateFormatted ?></span>&nbsp;&nbsp;To:&nbsp;&nbsp;<span style="text-decoration: underline;"><?= $endDateFormatted ?></span>
                         </div>
                     </td>
-                    <td style="width: 35%; text-align: right; font-size: 11px; padding-top: 2px;">
-                        <div>Statement Date:&nbsp;&nbsp;<?= $statementDateTime ?></div>
+                    <td style="width: 32%; text-align: right; font-size: 11px; padding-top: 2px;">
+                        <div class="statement-date-text">Statement Date:&nbsp;&nbsp;<?= $statementDateTime ?></div>
                         <!-- Page 1 of 1 thoda sa andar align (right edge se offset) -->
                         <div class="page-num-wrap">Page 1 of 1</div>
                     </td>
@@ -321,7 +326,7 @@ CSS;
                         <td colspan="4" style="border-left: 1px solid black;"></td>
                         <td class="col-withdr num-txt"><?= $totalDebit ?></td>
                         <td class="col-dep num-txt"><?= $totalCredit ?></td>
-                        <td class="col-bal"  style="border-right: 1px solid black;"></td>
+                        <td class="col-bal" style="border-right: 1px solid black;"></td>
                     </tr>
                 </tbody>
             </table>

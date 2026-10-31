@@ -20,8 +20,8 @@ class NarrationService {
         $this->bankModel = new MasterBank();
     }
 
-    public function getActiveTemplatesWithFields(): array {
-        $templates = $this->templateModel->getActiveTemplates();
+    public function getActiveTemplatesWithFields(?int $bankId = null): array {
+        $templates = $this->templateModel->getActiveTemplates($bankId);
         foreach ($templates as &$tpl) {
             $tpl['fields'] = $this->fieldModel->getFieldsByTemplateId($tpl['id']);
             foreach ($tpl['fields'] as &$field) {
@@ -36,7 +36,7 @@ class NarrationService {
     }
 
     public function getTemplateDetails(int $id): ?array {
-        $tpl = $this->templateModel->find($id);
+        $tpl = $this->templateModel->findWithBank($id);
         if (!$tpl) return null;
         
         $fields = $this->fieldModel->getFieldsByTemplateId($id);
@@ -82,9 +82,15 @@ class NarrationService {
             }
             $submittedKeys[] = $key;
 
-            $validTypes = ['text', 'number', 'amount', 'date', 'time', 'bank', 'account', 'iban', 'reference_no', 'transaction_id', 'stan', 'card_number', 'dropdown', 'textarea'];
+            $validTypes = [
+                'text', 'number', 'amount', 'date', 'time', 'bank', 
+                'account', 'masked_account', 'iban', 'masked_iban', 
+                'reference_no', 'transaction_id', 'stan', 
+                'card_number', 'masked_card', 'dropdown', 'textarea', 'pakistani_name',
+                'atm_code', 'custom_pattern', 'custom'
+            ];
             $type = $f['field_type'] ?? 'text';
-            if (!in_array($type, $validTypes, true)) {
+            if (!in_array($type, $validTypes, true) && !$this->isCustomTypeValid($type)) {
                 throw new Exception("Invalid field type '{$type}' for field '{$key}'.");
             }
         }
@@ -94,6 +100,23 @@ class NarrationService {
             if (!in_array($token, $submittedKeys, true)) {
                 throw new Exception("Pattern placeholder '{".$token."}' does not have a corresponding dynamic field defined.");
             }
+        }
+    }
+
+    /**
+     * Check if a field type is registered in narration_custom_types
+     */
+    public function isCustomTypeValid(string $type): bool {
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $type)) {
+            return false;
+        }
+        try {
+            require_once __DIR__ . '/../Models/CustomFieldType.php';
+            $customTypeModel = new CustomFieldType();
+            $found = $customTypeModel->findByCode($type);
+            return !empty($found);
+        } catch (Throwable $e) {
+            return false;
         }
     }
 
